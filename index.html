@@ -420,20 +420,27 @@ function resetGame() {
   hidePopup();
 }
 
-function startGame() {
+async function startGame() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    stream.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    alert('Camera access is required. Please allow camera access in Safari Settings and try again.');
+    return;
+  }
   document.getElementById('intro-screen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('scan-hint').classList.remove('hidden');
-  document.getElementById('ar-scene').style.display = 'block';
   document.getElementById('hud-stage').textContent = STAGES[1].hud;
-  setTimeout(() => {
-    const sceneEl = document.querySelector('a-scene');
-    sceneEl.addEventListener('loaded', () => {
-      const arSystem = sceneEl.systems['mindar-image-system'];
-      if (arSystem) arSystem.start();
-    });
-    setupTargetListeners();
-  }, 500);
+  const sceneEl = document.getElementById('ar-scene');
+  sceneEl.style.display = 'block';
+  const tryStart = () => {
+    const arSystem = sceneEl.systems && sceneEl.systems['mindar-image-system'];
+    if (arSystem) { arSystem.start(); setupTargetListeners(); }
+    else { setTimeout(tryStart, 200); }
+  };
+  if (sceneEl.hasLoaded) { setTimeout(tryStart, 300); }
+  else { sceneEl.addEventListener('loaded', () => setTimeout(tryStart, 300), { once: true }); }
 }
 
 function setupTargetListeners() {
