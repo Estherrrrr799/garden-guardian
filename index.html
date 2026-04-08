@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Garden Guardian · 花园守护者</title>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body { font-family: 'Crimson Text', Georgia, serif; background: #0a1a0a; overflow: hidden; }
+
+    /* ── SCREENS ── */
+    .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.6s ease; }
+    .screen.hidden { opacity: 0; pointer-events: none; }
+
+    /* ── INTRO SCREEN ── */
+    #intro-screen {
+      background: radial-gradient(ellipse at 30% 20%, #1a3a1a 0%, #0a1a0a 70%);
+      padding: 32px 24px;
+      text-align: center;
+    }
+    .intro-fairy { font-size: 72px; margin-bottom: 16px; animation: float 3s ease-in-out infinite; }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+    .intro-title { font-family: 'Cinzel', serif; font-size: 28px; color: #f0e8d0; margin-bottom: 6px; }
+    .intro-cn { font-family: 'Cinzel', serif; font-size: 16px; color: #c8973a; margin-bottom: 20px; letter-spacing: 0.2em; }
+    .intro-story { font-size: 15px; color: #a8c8a0; line-height: 1.8; margin-bottom: 28px; max-width: 320px; font-style: italic; }
+    .stars-display { display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; }
+    .star-icon { font-size: 28px; transition: all 0.3s; }
+    .star-icon.lost { filter: grayscale(1); opacity: 0.3; }
+    .btn-start {
+      background: linear-gradient(135deg, #2c5f2d, #1a3a1a);
+      border: 1.5px solid #c8973a;
+      color: #f0e8d0;
+      font-family: 'Cinzel', serif;
+      font-size: 16px;
+      padding: 14px 40px;
+      border-radius: 30px;
+      cursor: pointer;
+      letter-spacing: 0.1em;
+    }
+    .btn-start:active { transform: scale(0.97); }
+
+    /* ── HUD (during AR) ── */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 50;
+      padding: 16px 20px 12px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+    }
+    #hud.hidden { display: none; }
+    .hud-title { font-family: 'Cinzel', serif; font-size: 13px; color: #c8973a; letter-spacing: 0.15em; }
+    .hud-stars { display: flex; gap: 4px; }
+    .hud-star { font-size: 20px; transition: all 0.3s; }
+    .hud-star.lost { filter: grayscale(1); opacity: 0.25; }
+    .hud-stage { font-size: 12px; color: #9fcfa0; font-family: 'Cinzel', serif; }
+
+    /* ── POPUP PANEL ── */
+    #popup {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      z-index: 60;
+      background: linear-gradient(180deg, rgba(10,26,10,0.95) 0%, rgba(10,26,10,1) 100%);
+      border-top: 1px solid rgba(200,151,58,0.4);
+      border-radius: 20px 20px 0 0;
+      padding: 24px 24px 40px;
+      transform: translateY(100%);
+      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    #popup.show { transform: translateY(0); }
+    .popup-handle { width: 40px; height: 4px; background: rgba(200,151,58,0.4); border-radius: 2px; margin: 0 auto 20px; }
+    .popup-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
+    .popup-stage { font-family: 'Cinzel', serif; font-size: 10px; color: #c8973a; letter-spacing: 0.2em; text-align: center; margin-bottom: 6px; }
+    .popup-title { font-family: 'Cinzel', serif; font-size: 20px; color: #f0e8d0; text-align: center; margin-bottom: 12px; }
+    .popup-text { font-size: 14px; color: #a8c8a0; line-height: 1.8; font-style: italic; margin-bottom: 20px; text-align: center; }
+    .popup-task { background: rgba(200,151,58,0.08); border: 1px solid rgba(200,151,58,0.2); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+    .popup-task-label { font-family: 'Cinzel', serif; font-size: 9px; color: #c8973a; letter-spacing: 0.2em; margin-bottom: 8px; }
+    .popup-task-text { font-size: 14px; color: #d8e8d0; line-height: 1.7; }
+
+    /* ── PUZZLE AREA ── */
+    .puzzle-area { margin-bottom: 16px; }
+    .puzzle-label { font-family: 'Cinzel', serif; font-size: 10px; color: #9fcfa0; letter-spacing: 0.15em; margin-bottom: 10px; text-align: center; }
+    .direction-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .dir-btn {
+      background: rgba(159,207,160,0.1);
+      border: 1px solid rgba(159,207,160,0.25);
+      border-radius: 10px;
+      padding: 14px 10px;
+      color: #c8e8c0;
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .dir-btn:active, .dir-btn.selected { background: rgba(159,207,160,0.25); border-color: #9fcfa0; color: #e8f8e8; }
+    .dir-btn.wrong { background: rgba(200,60,60,0.2); border-color: rgba(200,60,60,0.5); animation: shake 0.4s; }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+    .answer-input {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(200,151,58,0.3);
+      border-radius: 10px;
+      padding: 14px 16px;
+      color: #f0e8d0;
+      font-family: 'Crimson Text', serif;
+      font-size: 16px;
+      outline: none;
+      margin-bottom: 12px;
+    }
+    .answer-input::placeholder { color: rgba(200,151,58,0.4); }
+    .answer-input:focus { border-color: rgba(200,151,58,0.6); }
+
+    .btn-confirm {
+      width: 100%;
+      background: linear-gradient(135deg, #2c5f2d, #1a3020);
+      border: 1.5px solid #c8973a;
+      color: #f0e8d0;
+      font-family: 'Cinzel', serif;
+      font-size: 15px;
+      padding: 15px;
+      border-radius: 12px;
+      cursor: pointer;
+      letter-spacing: 0.08em;
+    }
+    .btn-confirm:active { transform: scale(0.98); }
+    .btn-confirm.disabled { opacity: 0.4; pointer-events: none; }
+
+    /* ── RUNE DISPLAY ── */
+    .rune-display { display: flex; gap: 12px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .rune-badge {
+      background: rgba(200,151,58,0.15);
+      border: 1px solid rgba(200,151,58,0.4);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 22px;
+      text-align: center;
+    }
+    .rune-badge.unlocked { background: rgba(200,151,58,0.25); border-color: #c8973a; }
+    .rune-badge.locked { opacity: 0.3; filter: grayscale(1); }
+
+    /* ── FINALE ORDER ── */
+    .order-slots { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
+    .order-slot {
+      width: 70px; height: 70px;
+      background: rgba(200,151,58,0.08);
+      border: 1.5px dashed rgba(200,151,58,0.3);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .order-slot.filled { background: rgba(200,151,58,0.2); border-style: solid; border-color: #c8973a; }
+    .rune-choices { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
+    .rune-choice {
+      width: 60px; height: 60px;
+      background: rgba(159,207,160,0.1);
+      border: 1px solid rgba(159,207,160,0.3);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; cursor: pointer;
+      transition: all 0.2s;
+    }
+    .rune-choice:active { transform: scale(0.95); }
+    .rune-choice.used { opacity: 0.2; pointer-events: none; }
+
+    /* ── SUCCESS / FAIL ── */
+    #result-screen { background: rgba(10,26,10,0.97); padding: 40px 28px; text-align: center; }
+    .result-icon { font-size: 80px; margin-bottom: 16px; animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1); }
+    @keyframes pop { 0%{transform:scale(0)} 100%{transform:scale(1)} }
+    .result-title { font-family: 'Cinzel', serif; font-size: 26px; color: #f0e8d0; margin-bottom: 10px; }
+    .result-text { font-size: 15px; color: #a8c8a0; line-height: 1.8; font-style: italic; margin-bottom: 28px; max-width: 300px; }
+    .btn-retry {
+      background: rgba(200,60,60,0.2);
+      border: 1px solid rgba(200,60,60,0.5);
+      color: #f0d0d0;
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      padding: 12px 32px;
+      border-radius: 24px;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+
+    /* ── PENALTY OVERLAY ── */
+    #penalty-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(150,30,30,0.85);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s;
+    }
+    #penalty-overlay.show { opacity: 1; pointer-events: all; }
+    .penalty-icon { font-size: 60px; margin-bottom: 16px; animation: shake2 0.6s; }
+    @keyframes shake2 { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-10deg)} 75%{transform:rotate(10deg)} }
+    .penalty-title { font-family: 'Cinzel', serif; font-size: 22px; color: #f8d0d0; margin-bottom: 10px; }
+    .penalty-text { font-size: 14px; color: #f0c0c0; text-align: center; max-width: 280px; line-height: 1.7; margin-bottom: 8px; }
+    .penalty-timer { font-family: 'Cinzel', serif; font-size: 48px; color: #f8d0d0; margin: 16px 0; }
+
+    /* ── SCAN HINT ── */
+    #scan-hint {
+      position: fixed; bottom: 100px; left: 0; right: 0;
+      text-align: center; z-index: 50; pointer-events: none;
+    }
+    #scan-hint.hidden { display: none; }
+    .scan-hint-inner {
+      display: inline-block;
+      background: rgba(0,0,0,0.65);
+      border: 1px solid rgba(200,151,58,0.4);
+      border-radius: 24px;
+      padding: 10px 22px;
+      font-family: 'Cinzel', serif;
+      font-size: 12px;
+      color: #c8973a;
+      letter-spacing: 0.1em;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  </style>
+</head>
+<body>
+
+<!-- ══ INTRO SCREEN ══ -->
+<div class="screen" id="intro-screen">
+  <div class="intro-fairy">🧚</div>
+  <div class="intro-title">Garden Guardian</div>
+  <div class="intro-cn">花园守护者</div>
+  <div class="intro-story">
+    魔法风暴摧毁了精灵的家园，碎片散落花园各处。两位守护者需要合力找回所有碎片，在日落前重建家园。
+  </div>
+  <div class="stars-display">
+    <span class="star-icon" id="intro-star-1">⭐</span>
+    <span class="star-icon" id="intro-star-2">⭐</span>
+    <span class="star-icon" id="intro-star-3">⭐</span>
+  </div>
+  <button class="btn-start" onclick="startGame()">开始冒险</button>
+</div>
+
+<!-- ══ HUD ══ -->
+<div id="hud" class="hidden">
+  <div>
+    <div class="hud-title">Garden Guardian</div>
+    <div class="hud-stage" id="hud-stage">第一关 · 古树的秘密</div>
+  </div>
+  <div class="hud-stars">
+    <span class="hud-star" id="hud-star-1">⭐</span>
+    <span class="hud-star" id="hud-star-2">⭐</span>
+    <span class="hud-star" id="hud-star-3">⭐</span>
+  </div>
+</div>
+
+<!-- ══ SCAN HINT ══ -->
+<div id="scan-hint" class="hidden">
+  <div class="scan-hint-inner">对准标记卡扫描 ✦</div>
+</div>
+
+<!-- ══ POPUP PANEL ══ -->
+<div id="popup">
+  <div class="popup-handle"></div>
+  <div class="popup-icon" id="popup-icon">🌲</div>
+  <div class="popup-stage" id="popup-stage">第一关</div>
+  <div class="popup-title" id="popup-title">古树的秘密</div>
+  <div class="popup-text" id="popup-text">这棵古松见证了精灵村庄的诞生……</div>
+  <div class="popup-task">
+    <div class="popup-task-label" id="popup-task-label">你的任务</div>
+    <div class="popup-task-text" id="popup-task-text"></div>
+  </div>
+  <div id="puzzle-container"></div>
+  <button class="btn-confirm" id="btn-confirm" onclick="confirmAnswer()">确认</button>
+</div>
+
+<!-- ══ PENALTY OVERLAY ══ -->
+<div id="penalty-overlay">
+  <div class="penalty-icon">💨</div>
+  <div class="penalty-title">魔法干扰！</div>
+  <div class="penalty-text" id="penalty-text">失去一颗能量星！两人必须背对背重新描述，不能说话！</div>
+  <div class="penalty-timer" id="penalty-timer">30</div>
+  <div style="font-size:13px;color:#f0c0c0;font-style:italic">倒计时结束后可继续</div>
+</div>
+
+<!-- ══ RESULT SCREEN ══ -->
+<div class="screen hidden" id="result-screen">
+  <div class="result-icon" id="result-icon">✨</div>
+  <div class="result-title" id="result-title">家园重建！</div>
+  <div class="result-text" id="result-text">守护者，你们做到了！</div>
+  <button class="btn-retry" id="result-btn" onclick="resetGame()">重新开始</button>
+</div>
+
+<!-- ══ AR SCENE ══ -->
+<a-scene
+  id="ar-scene"
+  style="display:none"
+  mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no;"
+  color-space="sRGB"
+  renderer="colorManagement: true, physicallyCorrectLights"
+  vr-mode-ui="enabled: false"
+  device-orientation-permission-ui="enabled: false">
+
+  <a-assets>
+    <a-asset-item id="fairy-model" src="https://cdn.jsdelivr.net/gh/nicktarnold/3d-assets@main/fairy.glb"></a-asset-item>
+  </a-assets>
+
+  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+  <!-- Target 0: Pine Tree (起点) -->
+  <a-entity id="target-pine" mindar-image-target="targetIndex: 0">
+    <a-entity
+      gltf-model="#fairy-model"
+      position="0 0.1 0"
+      scale="0.15 0.15 0.15"
+      animation="property: rotation; to: 0 360 0; loop: true; dur: 6000; easing: linear">
+    </a-entity>
+    <a-entity
+      geometry="primitive: plane; width: 0.4; height: 0.12"
+      material="color: #1a3a1a; opacity: 0.85; side: double"
+      position="0 0.28 0"
+      rotation="0 0 0">
+      <a-text value="✦ 精灵在此 ✦" align="center" color="#c8973a" width="1.2" position="0 0 0.001"></a-text>
+    </a-entity>
+    <a-entity
+      geometry="primitive: sphere; radius: 0.06"
+      material="color: #9fcfa0; emissive: #4a8c3f; emissiveIntensity: 0.5; opacity: 0.7"
+      position="0.15 0.22 0"
+      animation="property: position; to: 0.15 0.28 0; loop: true; dur: 1500; dir: alternate; easing: easeInOutSine">
+    </a-entity>
+  </a-entity>
+
+  <!-- Target 1: Stump (枯树桩) -->
+  <a-entity id="target-stump" mindar-image-target="targetIndex: 1">
+    <a-entity
+      geometry="primitive: sphere; radius: 0.12"
+      material="color: #c8783c; emissive: #8a4a1c; emissiveIntensity: 0.6; opacity: 0.85"
+      position="0 0.15 0"
+      animation="property: scale; to: 1.2 1.2 1.2; loop: true; dur: 1000; dir: alternate; easing: easeInOutSine">
+    </a-entity>
+    <a-entity
+      geometry="primitive: ring; radiusInner: 0.08; radiusOuter: 0.12"
+      material="color: #e8a060; opacity: 0.5; side: double"
+      position="0 0.15 0"
+      animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
+    </a-entity>
+    <a-entity
+      geometry="primitive: plane; width: 0.45; height: 0.12"
+      material="color: #2a1a08; opacity: 0.85; side: double"
+      position="0 0.32 0">
+      <a-text value="风暴的记忆" align="center" color="#e8a060" width="1.3" position="0 0 0.001"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- Target 2: Bench A (左长椅) -->
+  <a-entity id="target-bench-a" mindar-image-target="targetIndex: 2">
+    <a-entity
+      geometry="primitive: dodecahedron; radius: 0.1"
+      material="color: #64a0dc; emissive: #1a4a8c; emissiveIntensity: 0.5; opacity: 0.9"
+      position="0 0.15 0"
+      animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear">
+    </a-entity>
+    <a-entity
+      geometry="primitive: plane; width: 0.5; height: 0.12"
+      material="color: #081420; opacity: 0.85; side: double"
+      position="0 0.30 0">
+      <a-text value="星座 · 左半边" align="center" color="#90c0f0" width="1.4" position="0 0 0.001"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- Target 3: Bench B (右长椅) -->
+  <a-entity id="target-bench-b" mindar-image-target="targetIndex: 3">
+    <a-entity
+      geometry="primitive: dodecahedron; radius: 0.1"
+      material="color: #b464dc; emissive: #6a1a9c; emissiveIntensity: 0.5; opacity: 0.9"
+      position="0 0.15 0"
+      animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear">
+    </a-entity>
+    <a-entity
+      geometry="primitive: plane; width: 0.5; height: 0.12"
+      material="color: #140820; opacity: 0.85; side: double"
+      position="0 0.30 0">
+      <a-text value="星座 · 右半边" align="center" color="#d090f0" width="1.4" position="0 0 0.001"></a-text>
+    </a-entity>
+  </a-entity>
+
+</a-scene>
+
+<script>
+// ══ GAME STATE ══
+const STATE = {
+  stars: 3,
+  stage: 0, // 0=intro, 1=pine, 2=stump, 3=bench, 4=finale
+  unlockedRunes: [],
+  selectedDir: null,
+  finaleSlots: [null, null, null],
+  finaleChoices: ['🌿','🔮','🍄'],
+  correctOrder: ['🌿','🍄','🔮'],
+  playerRole: null, // 'A' or 'B'
+  penaltyActive: false,
+};
+
+// ══ STAGE CONTENT ══
+const STAGES = {
+  1: {
+    icon: '🌲', stage: '第一关', title: '古树的秘密',
+    story: '这棵古松已在此伫立数百年，影子里藏着第一块碎片的线索……',
+    taskA: '扫描松树标记卡后，AR精灵显示一个神秘符号。把符号形状描述给玩家B，然后按B的指引沿影子方向走到终点。',
+    taskB: '听玩家A描述符号形状，对照下方罗盘选择正确的方向。',
+    puzzle: 'direction',
+    correctDir: '东北方 ↗',
+    hud: '第一关 · 古树的秘密',
+  },
+  2: {
+    icon: '🪵', stage: '第二关', title: '风暴的记忆',
+    story: '这棵树被魔法风暴击倒，但树心里还留着风暴来临方向的秘密……',
+    taskA: '听玩家B描述风暴方向，对照罗盘选择正确方向并确认。',
+    taskB: '扫描树桩后AR播放提示："风从西南方来袭"。把这个信息告诉玩家A。',
+    puzzle: 'direction',
+    correctDir: '西南方 ↙',
+    hud: '第二关 · 风暴的记忆',
+  },
+  3: {
+    icon: '🪑', stage: '第三关', title: '星座的秘密',
+    story: '两张长椅各守护着星空的一半。两人需要合力拼出完整的星座名……',
+    taskA: '扫描左长椅后看到半张星座图（左半部分：三颗星呈弧形）。描述给玩家B听，然后一起猜出星座名输入。',
+    taskB: '扫描右长椅后看到半张星座图（右半部分：两颗星连成一线）。描述给玩家A听，然后一起猜出星座名输入。',
+    puzzle: 'text',
+    correctAnswer: '猎户座',
+    hud: '第三关 · 星座的秘密',
+  },
+  4: {
+    icon: '🏡', stage: '终章', title: '家园重建',
+    story: '三块碎片齐聚！把它们按正确顺序排列，精灵村庄即将重建……',
+    task: '两人走到草坪中央，回忆三关的线索，把三个符文按正确顺序排列。',
+    puzzle: 'order',
+    hud: '终章 · 家园重建',
+  },
+};
+
+// ══ CORE FUNCTIONS ══
+function updateStars() {
+  [1,2,3].forEach(i => {
+    const lost = i > STATE.stars;
+    document.getElementById(`intro-star-${i}`)?.classList.toggle('lost', lost);
+    document.getElementById(`hud-star-${i}`)?.classList.toggle('lost', lost);
+  });
+}
+
+function losestar(msg, penaltyMsg) {
+  if (STATE.penaltyActive) return;
+  STATE.stars = Math.max(0, STATE.stars - 1);
+  updateStars();
+  if (STATE.stars <= 0) {
+    showGameOver();
+    return;
+  }
+  showPenalty(penaltyMsg || '失去一颗能量星！重新尝试。');
+}
+
+function showPenalty(msg, duration = 30) {
+  STATE.penaltyActive = true;
+  document.getElementById('penalty-text').textContent = msg;
+  const overlay = document.getElementById('penalty-overlay');
+  const timerEl = document.getElementById('penalty-timer');
+  overlay.classList.add('show');
+  let t = duration;
+  timerEl.textContent = t;
+  const interval = setInterval(() => {
+    t--;
+    timerEl.textContent = t;
+    if (t <= 0) {
+      clearInterval(interval);
+      overlay.classList.remove('show');
+      STATE.penaltyActive = false;
+    }
+  }, 1000);
+}
+
+function showGameOver() {
+  hidePopup();
+  const screen = document.getElementById('result-screen');
+  document.getElementById('result-icon').textContent = '😔';
+  document.getElementById('result-title').textContent = '精灵能量耗尽了……';
+  document.getElementById('result-text').textContent = '但精灵还有一口气。守护者，重新出发吧，这次一定能成功！';
+  document.getElementById('result-btn').textContent = '重新开始';
+  screen.classList.remove('hidden');
+}
+
+function showVictory() {
+  hidePopup();
+  const screen = document.getElementById('result-screen');
+  document.getElementById('result-icon').textContent = '✨';
+  document.getElementById('result-title').textContent = '家园重建了！';
+  document.getElementById('result-text').textContent = `守护者，你们做到了！精灵村庄在草地上重新建成，感谢两位守护者的坚守。剩余能量星：${STATE.stars} ⭐`;
+  document.getElementById('result-btn').textContent = '再玩一次';
+  screen.classList.remove('hidden');
+}
+
+function resetGame() {
+  STATE.stars = 3;
+  STATE.stage = 0;
+  STATE.unlockedRunes = [];
+  STATE.selectedDir = null;
+  STATE.finaleSlots = [null, null, null];
+  updateStars();
+  document.getElementById('result-screen').classList.add('hidden');
+  document.getElementById('intro-screen').classList.remove('hidden');
+  hidePopup();
+}
+
+// ══ AR + GAME START ══
+function startGame() {
+  document.getElementById('intro-screen').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('scan-hint').classList.remove('hidden');
+  const scene = document.getElementById('ar-scene');
+  scene.style.display = 'block';
+  STATE.stage = 1;
+  document.getElementById('hud-stage').textContent = STAGES[1].hud;
+
+  // Init MindAR after short delay
+  setTimeout(() => {
+    const sceneEl = document.querySelector('a-scene');
+    sceneEl.addEventListener('loaded', () => {
+      const arSystem = sceneEl.systems['mindar-image-system'];
+      if (arSystem) arSystem.start();
+    });
+    // Listen for target events
+    setupTargetListeners();
+  }, 500);
+}
+
+function setupTargetListeners() {
+  const targets = [
+    { id: 'target-pine',    stage: 1 },
+    { id: 'target-stump',   stage: 2 },
+    { id: 'target-bench-a', stage: 3, role: 'A' },
+    { id: 'target-bench-b', stage: 3, role: 'B' },
+  ];
+  targets.forEach(t => {
+    const el = document.getElementById(t.id);
+    if (!el) return;
+    el.addEventListener('targetFound', () => {
+      if (STATE.stage === t.stage || (t.stage === 3 && STATE.stage === 3)) {
+        STATE.playerRole = t.role || null;
+        showStagePopup(t.stage);
+      }
+    });
+  });
+}
+
+// ══ POPUP ══
+function showStagePopup(stage) {
+  const s = STAGES[stage];
+  if (!s) return;
+  document.getElementById('popup-icon').textContent = s.icon;
+  document.getElementById('popup-stage').textContent = s.stage;
+  document.getElementById('popup-title').textContent = s.title;
+  document.getElementById('popup-text').textContent = s.story;
+
+  // Task text based on role
+  let taskText = s.task || '';
+  if (stage === 1 || stage === 2) {
+    taskText = STATE.playerRole === 'B' ? (s.taskB || s.taskA) : s.taskA;
+  } else if (stage === 3) {
+    taskText = STATE.playerRole === 'B' ? s.taskB : s.taskA;
+  }
+  document.getElementById('popup-task-label').textContent =
+    STATE.playerRole ? `玩家${STATE.playerRole} · 你的任务` : '你的任务';
+  document.getElementById('popup-task-text').textContent = taskText;
+
+  // Build puzzle
+  buildPuzzle(stage, s);
+
+  document.getElementById('scan-hint').classList.add('hidden');
+  document.getElementById('popup').classList.add('show');
+}
+
+function hidePopup() {
+  document.getElementById('popup').classList.remove('show');
+  document.getElementById('scan-hint').classList.remove('hidden');
+}
+
+function buildPuzzle(stage, s) {
+  const container = document.getElementById('puzzle-container');
+  const confirmBtn = document.getElementById('btn-confirm');
+  container.innerHTML = '';
+  STATE.selectedDir = null;
+  confirmBtn.classList.remove('disabled');
+
+  if (s.puzzle === 'direction') {
+    const dirs = ['北方 ↑','南方 ↓','东北方 ↗','西南方 ↙'];
+    container.innerHTML = `
+      <div class="puzzle-area">
+        <div class="puzzle-label">选择正确方向</div>
+        <div class="direction-grid">
+          ${dirs.map(d => `<button class="dir-btn" onclick="selectDir(this,'${d}')">${d}</button>`).join('')}
+        </div>
+      </div>`;
+    confirmBtn.classList.add('disabled');
+  } else if (s.puzzle === 'text') {
+    container.innerHTML = `
+      <div class="puzzle-area">
+        <div class="puzzle-label">输入星座名称（两人同时输入相同答案）</div>
+        <input class="answer-input" id="answer-input" placeholder="例如：猎户座" oninput="checkInputReady()">
+      </div>`;
+  } else if (s.puzzle === 'order') {
+    STATE.finaleSlots = [null, null, null];
+    buildFinale(container);
+  }
+}
+
+function selectDir(btn, dir) {
+  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  STATE.selectedDir = dir;
+  document.getElementById('btn-confirm').classList.remove('disabled');
+}
+
+function checkInputReady() {
+  const val = document.getElementById('answer-input')?.value?.trim();
+  document.getElementById('btn-confirm').classList.toggle('disabled', !val);
+}
+
+function buildFinale(container) {
+  const slotsHtml = STATE.finaleSlots.map((s,i) =>
+    `<div class="order-slot ${s?'filled':''}" id="slot-${i}" onclick="clearSlot(${i})">${s||''}</div>`
+  ).join('');
+  const choicesHtml = STATE.finaleChoices.map((r,i) =>
+    `<div class="rune-choice ${STATE.finaleSlots.includes(r)?'used':''}" onclick="placeRune('${r}')">${r}</div>`
+  ).join('');
+  container.innerHTML = `
+    <div class="puzzle-area">
+      <div class="puzzle-label">按正确顺序排列三个符文</div>
+      <div class="order-slots">${slotsHtml}</div>
+      <div class="rune-choices">${choicesHtml}</div>
+    </div>`;
+  document.getElementById('btn-confirm').classList.toggle('disabled', STATE.finaleSlots.includes(null));
+}
+
+function placeRune(rune) {
+  const emptyIdx = STATE.finaleSlots.indexOf(null);
+  if (emptyIdx === -1) return;
+  STATE.finaleSlots[emptyIdx] = rune;
+  buildFinale(document.getElementById('puzzle-container'));
+  document.getElementById('btn-confirm').classList.toggle('disabled', STATE.finaleSlots.includes(null));
+}
+
+function clearSlot(idx) {
+  STATE.finaleSlots[idx] = null;
+  buildFinale(document.getElementById('puzzle-container'));
+  document.getElementById('btn-confirm').classList.add('disabled');
+}
+
+// ══ CONFIRM ANSWER ══
+function confirmAnswer() {
+  const stage = STATE.stage;
+  const s = STAGES[stage];
+  if (!s) return;
+
+  if (s.puzzle === 'direction') {
+    if (!STATE.selectedDir) return;
+    if (STATE.selectedDir === s.correctDir) {
+      advanceStage();
+    } else {
+      // Wrong answer
+      document.querySelectorAll('.dir-btn').forEach(b => {
+        if (b.classList.contains('selected')) b.classList.add('wrong');
+      });
+      const msg = stage === 2
+        ? '方向错误！失去一颗能量星。两人保持30秒禁言，只能用手势沟通后重试。'
+        : '方向错误！失去一颗能量星，重新回到松树读取新线索。';
+      setTimeout(() => losestar('wrong', msg), 400);
+    }
+  } else if (s.puzzle === 'text') {
+    const val = document.getElementById('answer-input')?.value?.trim();
+    if (!val) return;
+    if (val === s.correctAnswer || val.includes('猎户') || val.includes('Orion')) {
+      advanceStage();
+    } else {
+      losestar('wrong', '答案不一致！失去一颗能量星。两人背对背重新描述各自看到的星座图案。');
+      document.getElementById('answer-input').value = '';
+      document.getElementById('btn-confirm').classList.add('disabled');
+    }
+  } else if (s.puzzle === 'order') {
+    const correct = STATE.correctOrder;
+    const match = STATE.finaleSlots.every((r,i) => r === correct[i]);
+    if (match) {
+      showVictory();
+    } else {
+      losestar('wrong', '顺序错误！失去一颗能量星。重新回忆前三关的线索……');
+      STATE.finaleSlots = [null, null, null];
+      buildFinale(document.getElementById('puzzle-container'));
+    }
+  }
+}
+
+function advanceStage() {
+  const runes = ['🌿','🍄','🔮'];
+  if (STATE.stage <= 3) STATE.unlockedRunes.push(runes[STATE.stage - 1]);
+  STATE.stage++;
+  hidePopup();
+
+  if (STATE.stage === 4) {
+    document.getElementById('hud-stage').textContent = STAGES[4].hud;
+    setTimeout(() => showStagePopup(4), 800);
+  } else if (STATE.stage > 4) {
+    showVictory();
+  } else {
+    document.getElementById('hud-stage').textContent = STAGES[STATE.stage]?.hud || '';
+  }
+}
+</script>
+</body>
+</html>
