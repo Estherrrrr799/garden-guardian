@@ -317,23 +317,31 @@ body{font-family:'Crimson Text',Georgia,serif;background:#0a1a0a;overflow:hidden
 
 <script>
 // ══════════════════════════════════════════
-// AUDIO ENGINE
+// AUDIO ENGINE  (iOS-safe)
 // ══════════════════════════════════════════
 let AC = null;
-function getAC() {
-  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
-  return AC;
+
+// Must be called synchronously inside a user-gesture handler on iOS
+function bootAudio() {
+  try {
+    if (!AC) {
+      AC = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (AC.state === 'suspended') {
+      AC.resume();
+    }
+  } catch(e) {}
 }
-function resumeAC() {
-  try { const ac = getAC(); if (ac.state === 'suspended') ac.resume(); } catch(e) {}
-}
-document.addEventListener('touchstart', resumeAC, { once: true });
-document.addEventListener('click', resumeAC, { once: true });
+
+// Keep backward-compat alias
+function resumeAC() { bootAudio(); }
 
 function note(freq, type, dur, vol, delay) {
   delay = delay || 0; vol = vol || 0.22;
   try {
-    const ac = getAC();
+    bootAudio();
+    const ac = AC;
+    if (!ac) return;
     const o = ac.createOscillator();
     const g = ac.createGain();
     const t = ac.currentTime + delay;
@@ -565,7 +573,7 @@ const HINTS = {
 };
 let bubbleTimer = null;
 function fairyTap() {
-  resumeAC(); SFX.click();
+  bootAudio(); SFX.click();
   const hs = S.role ? HINTS[S.role][Math.min(S.stage, 3)] : null;
   if (!hs) return;
   showBubble(hs[Math.floor(Math.random() * hs.length)]);
@@ -595,7 +603,8 @@ function updateStars() {
 // ROLE SELECT
 // ══════════════════════════════════════════
 function pickRole(role) {
-  resumeAC(); SFX.select();
+  bootAudio();  // Must be first — synchronous inside tap handler
+  SFX.select();
   S.role = role;
   document.getElementById('role-screen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -806,7 +815,7 @@ function buildOrder() {
 // PUZZLE INTERACTIONS
 // ══════════════════════════════════════════
 function selDir(btn, dir) {
-  resumeAC(); SFX.click();
+  bootAudio(); SFX.click();
   document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on'); S.selDir = dir;
   document.getElementById('btn-ok').className = 'btn-ok';
@@ -816,7 +825,7 @@ function chkTxt() {
   document.getElementById('btn-ok').className = v ? 'btn-ok' : 'btn-ok off';
 }
 function putRune(r) {
-  resumeAC(); SFX.click();
+  bootAudio(); SFX.click();
   const i = S.finaleSlots.indexOf(null);
   if (i === -1) return;
   S.finaleSlots[i] = r; buildOrder();
@@ -829,7 +838,7 @@ function clrSlot(i) {
 // CONFIRM ANSWER
 // ══════════════════════════════════════════
 function confirm_answer() {
-  resumeAC();
+  bootAudio();
   const c = S.stage === 3 ? CONTENT.finale : CONTENT[S.role][S.stage];
   if (!c) return;
 
@@ -876,13 +885,13 @@ function confirm_answer() {
 // WAIT SCREEN
 // ══════════════════════════════════════════
 function showWait(title, text) {
-  resumeAC(); SFX.stage();
+  bootAudio(); SFX.stage();
   document.getElementById('wt-title').textContent = title;
   document.getElementById('wt-text').textContent = text;
   document.getElementById('wait-screen').classList.remove('hidden');
 }
 function dismissWait() {
-  resumeAC(); SFX.click();
+  bootAudio(); SFX.click();
   document.getElementById('wait-screen').classList.add('hidden');
   S.stage++; S.solved = false;
   if (S.stage === 3) {
@@ -934,7 +943,7 @@ function showVictory() {
   document.getElementById('result-screen').classList.remove('hidden');
 }
 function resetGame() {
-  resumeAC(); SFX.click();
+  bootAudio(); SFX.click();
   Object.assign(S, { role:null, stars:3, stage:1, solved:false, selDir:null, finaleSlots:[null,null,null], penaltyActive:false });
   updateStars();
   ['result-screen','wait-screen'].forEach(id => document.getElementById(id).classList.add('hidden'));
