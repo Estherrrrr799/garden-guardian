@@ -641,7 +641,7 @@ function buildPuzzle(c) {
 
   } else if (c.puzzle === 'text') {
     const diagram = S.role === 'A' ? buildStarLeft() : buildStarRight();
-    pz.innerHTML = diagram + `<div class="pz"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Orion" oninput="chkTxt()"></div>`;
+    pz.innerHTML = diagram + `<div class="pz"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Taurus" oninput="chkTxt()"></div>`;
 
   } else if (c.puzzle === 'order') {
     S.finaleSlots = [null, null, null];
