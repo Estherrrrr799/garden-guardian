@@ -317,163 +317,70 @@ body{font-family:'Crimson Text',Georgia,serif;background:#0a1a0a;overflow:hidden
 
 <script>
 // ══════════════════════════════════════════
-// AUDIO ENGINE  (iOS Safari — fresh context per gesture)
+// AUDIO  (iOS Safari — new context per gesture)
 // ══════════════════════════════════════════
+// iOS rules: AudioContext must be created synchronously inside a
+// user-gesture call stack. We make a fresh one per SFX call.
 
-// On iOS, AudioContext must be created AND used in the same synchronous
-// user-gesture stack. We create a fresh unlocked context each time we
-// want to play a sound, schedule the notes, then let it close itself.
-function playNote(freq, type, dur, vol, delay) {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    const t = ctx.currentTime + (delay || 0);
-    vol = vol || 0.22;
-    o.type = type || 'sine';
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.025);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(ctx.destination);
-    o.start(t); o.stop(t + dur + 0.06);
-    // close context shortly after last note ends
-    setTimeout(() => { try { ctx.close(); } catch(e){} }, (t - ctx.currentTime + dur + 0.2) * 1000);
-  } catch(e) {}
+function _makeCtx() {
+  return new (window.AudioContext || window.webkitAudioContext)();
 }
 
-// Shared context for multi-note SFX (created once per gesture call)
-let _sfxCtx = null;
-function _ctx() {
-  if (!_sfxCtx || _sfxCtx.state === 'closed') {
-    _sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  return _sfxCtx;
-}
-function _note(ctx, freq, type, dur, vol, delay) {
+function _n(ctx, freq, type, dur, vol, delay) {
   try {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     const t = ctx.currentTime + (delay || 0);
-    vol = vol || 0.22;
     o.type = type || 'sine';
     o.frequency.value = freq;
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.025);
+    g.gain.linearRampToValueAtTime(vol || 0.22, t + 0.025);
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(ctx.destination);
-    o.start(t); o.stop(t + dur + 0.06);
+    o.connect(g);
+    g.connect(ctx.destination);
+    o.start(t);
+    o.stop(t + dur + 0.06);
   } catch(e) {}
 }
 
-function bootAudio() { /* no-op — context created per-gesture now */ }
-function resumeAC()  { /* no-op */ }
-
-function note(freq, type, dur, vol, delay) {
-  // legacy shim — use playNote for single notes
-  playNote(freq, type, dur, vol, delay);
-  return; {  // dead block kept for structure
-  const ac = null;
-    const o = ac.createOscillator();
-    const g = ac.createGain();
-    const t = ac.currentTime + delay;
-    o.type = type || 'sine';
-    o.frequency.value = freq;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(ac.destination);
-    o.start(t); o.stop(t + dur + 0.05);
+function _play(notes) {
+  // notes = [[freq, type, dur, vol, delay], ...]
+  try {
+    const ctx = _makeCtx();
+    const maxEnd = notes.reduce((m, n) => Math.max(m, (n[4]||0) + n[2]), 0);
+    notes.forEach(n => _n(ctx, n[0], n[1], n[2], n[3], n[4]));
+    setTimeout(() => { try { ctx.close(); } catch(e) {} }, (maxEnd + 0.3) * 1000);
   } catch(e) {}
 }
 
 const SFX = {
-  select() {
-    const c = _ctx();
-    _note(c,880,'sine',.14,.2,0);
-    _note(c,1108,'sine',.16,.22,.11);
-    _note(c,1320,'sine',.22,.18,.22);
-    setTimeout(()=>{try{c.close();}catch(e){}},600);
-  },
-  // Scan — discovery ding
-  scan() {
-    const c=_ctx();
-    _note(c,523,'sine',.1,.18,0);
-    _note(c,784,'sine',.12,.22,.09);
-    _note(c,1047,'sine',.2,.28,.18);
-    setTimeout(()=>{try{c.close();}catch(e){}},500);
-  },
-  // Direction select click
-  click() { playNote(660,'sine',.08,.14,0); },
-  // Correct answer — ascending triumph
-  correct() {
-    const c=_ctx();
-    [523,659,784,1047].forEach((f,i)=>_note(c,f,'sine',.25,.28,i*.1));
-    _note(c,1568,'sine',.45,.3,.45);
-    setTimeout(()=>{try{c.close();}catch(e){}},900);
-  },
-  // Wrong answer — low thud
-  wrong() {
-    const c=_ctx();
-    _note(c,200,'sawtooth',.1,.3,0);
-    _note(c,160,'sawtooth',.16,.28,.1);
-    _note(c,120,'sawtooth',.22,.22,.22);
-    setTimeout(()=>{try{c.close();}catch(e){}},600);
-  },
-  // Stage clear — fanfare
-  stage() {
-    const c=_ctx();
-    _note(c,784,'sine',.2,.28,0);
-    _note(c,1047,'sine',.24,.32,.16);
-    _note(c,1319,'sine',.3,.3,.32);
-    _note(c,1568,'sine',.38,.28,.5);
-    setTimeout(()=>{try{c.close();}catch(e){}},1000);
-  },
-  // Star lost — sad descend
-  star() {
-    const c=_ctx();
-    _note(c,440,'triangle',.16,.28,0);
-    _note(c,349,'triangle',.2,.25,.16);
-    _note(c,262,'triangle',.28,.22,.32);
-    setTimeout(()=>{try{c.close();}catch(e){}},800);
-  },
-  // Victory — full melody
+  select()  { _play([[880,'sine',.14,.20,0],[1108,'sine',.16,.22,.11],[1320,'sine',.22,.18,.23]]); },
+  scan()    { _play([[523,'sine',.10,.18,0],[784,'sine',.12,.22,.09],[1047,'sine',.20,.28,.19]]); },
+  click()   { _play([[660,'sine',.08,.14,0]]); },
+  correct() { _play([[523,'sine',.25,.28,0],[659,'sine',.25,.28,.10],[784,'sine',.25,.28,.20],[1047,'sine',.25,.28,.30],[1568,'sine',.45,.30,.45]]); },
+  wrong()   { _play([[200,'sawtooth',.10,.30,0],[160,'sawtooth',.16,.28,.10],[120,'sawtooth',.22,.22,.22]]); },
+  stage()   { _play([[784,'sine',.20,.28,0],[1047,'sine',.24,.32,.16],[1319,'sine',.30,.30,.33],[1568,'sine',.38,.28,.50]]); },
+  star()    { _play([[440,'triangle',.16,.28,0],[349,'triangle',.20,.25,.16],[262,'triangle',.28,.22,.33]]); },
+  penalty() { _play([[180,'sawtooth',.55,.40,0],[160,'sawtooth',.55,.35,.16],[140,'sawtooth',.65,.30,.33]]); },
+  appear()  { _play([[1047,'sine',.12,.18,0],[1319,'sine',.14,.20,.12],[1568,'sine',.10,.15,.24]]); },
   victory() {
-    const c=_ctx();
-    const mel=[523,659,784,1047,1319,1568,2093];
-    mel.forEach((f,i)=>_note(c,f,'sine',.38,.3,i*.13));
-    mel.slice().reverse().forEach((f,i)=>_note(c,f,'sine',.3,.25,mel.length*.13+.25+i*.1));
-    setTimeout(()=>{try{c.close();}catch(e){}},3500);
-  },
-  // Fairy appear
-  appear() {
-    const c=_ctx();
-    _note(c,1047,'sine',.12,.18,0);
-    _note(c,1319,'sine',.14,.2,.11);
-    _note(c,1568,'sine',.1,.15,.22);
-    setTimeout(()=>{try{c.close();}catch(e){}},500);
-  },
-  // Penalty alarm
-  penalty() {
-    const c=_ctx();
-    _note(c,180,'sawtooth',.55,.4,0);
-    _note(c,160,'sawtooth',.55,.35,.16);
-    _note(c,140,'sawtooth',.65,.3,.32);
-    setTimeout(()=>{try{c.close();}catch(e){}},1200);
+    const mel = [523,659,784,1047,1319,1568,2093];
+    const up  = mel.map((f,i) => [f,'sine',.38,.30,i*.13]);
+    const dn  = mel.slice().reverse().map((f,i) => [f,'sine',.30,.25,mel.length*.13+.25+i*.10]);
+    _play([...up,...dn]);
   }
 };
 
 // ══════════════════════════════════════════
 // PARTICLES & FLASH
 // ══════════════════════════════════════════
-function burst(n, colors, fromTop) {
+function burst(n, colors) {
   const p = document.getElementById('particles');
   for (let i = 0; i < n; i++) {
     const el = document.createElement('div');
     el.className = 'pt';
     const s = Math.random() * 12 + 5;
-    const bottom = fromTop ? (Math.random() * 40 + 60) : (Math.random() * 25);
-    el.style.cssText = `width:${s}px;height:${s}px;background:${colors[Math.floor(Math.random()*colors.length)]};left:${Math.random()*100}%;bottom:${bottom}%;animation-duration:${Math.random()*2+1.5}s;animation-delay:${Math.random()*.6}s;border-radius:${Math.random()>0.5?'50%':'3px'}`;
+    el.style.cssText = `width:${s}px;height:${s}px;background:${colors[Math.floor(Math.random()*colors.length)]};left:${Math.random()*100}%;bottom:${Math.random()*30}%;animation-duration:${Math.random()*2+1.5}s;animation-delay:${Math.random()*.6}s;border-radius:${Math.random()>.5?'50%':'3px'}`;
     p.appendChild(el);
     setTimeout(() => el.remove(), 4000);
   }
@@ -482,9 +389,8 @@ function correctBurst() {
   burst(20, ['#c8973a','#9fcfa0','#f0e8d0','#64a0dc','#ffd700']);
 }
 function victoryBurst() {
-  for (let i = 0; i < 5; i++) {
-    setTimeout(() => burst(24, ['#c8973a','#9fcfa0','#f0e8d0','#d090f0','#90c0f0','#ffd700','#f5c4b3'], i%2===0), i * 350);
-  }
+  for (let i = 0; i < 5; i++)
+    setTimeout(() => burst(24, ['#c8973a','#9fcfa0','#f0e8d0','#d090f0','#90c0f0','#ffd700','#f5c4b3']), i*350);
 }
 function flash(color, dur) {
   const el = document.getElementById('flash');
@@ -497,11 +403,8 @@ function flash(color, dur) {
 // GAME STATE
 // ══════════════════════════════════════════
 const S = {
-  role: null,   // 'A' or 'B'
-  stars: 3,
-  stage: 1,     // 1 = first scan, 2 = bench scan, 3 = finale
-  solved: false,
-  selDir: null,
+  role: null, stars: 3, stage: 1,
+  solved: false, selDir: null,
   finaleSlots: [null, null, null],
   penaltyActive: false
 };
@@ -512,87 +415,66 @@ const S = {
 const CONTENT = {
   A: {
     1: {
-      icon: '🌲',
-      stageLabel: 'Stage One · Detective',
-      title: "The Ancient Tree's Secret",
-      story: "The ancient sequoia holds the first clue. As a detective, you must read the evidence the fairy left behind and work out the direction yourself.",
-      clueLabel: "Fairy's Message — found on the tree bark",
+      icon: '🌲', stageLabel: 'Stage One · Detective', title: "The Ancient Tree's Secret",
+      story: "The ancient sequoia holds the first clue. As a detective, read the evidence the fairy left behind and work out the direction yourself.",
+      clueLabel: "Fairy's message — found on the tree bark",
       clueClass: 'ca',
       clue: `"The afternoon sun casts my shadow toward the North-East.\nThe first crystal fragment lies at the end of that shadow.\nFollow the shadow — it will lead you to the LEFT bench."`,
       taskLabel: 'Player A · Your Task',
-      task: 'Read the fairy\'s message above carefully.\nWork out the direction from the clue, then select it below.\nThis will reveal where your next marker is hidden.',
-      puzzle: 'direction',
-      correct: 'North-East ↗',
-      successMsg: 'Correct! The shadow points North-East.\nThe LEFT bench is your next destination — scan the marker on the back of the backrest!',
-      hud: 'Stage 1 · Pine Tree',
-      hint: 'Scan the pine tree marker ✦'
+      task: 'Read the fairy\'s message carefully.\nWork out the direction from the clue, then select it below.\nThis will reveal where your next marker is hidden.',
+      puzzle: 'direction', correct: 'North-East ↗',
+      successMsg: 'Correct! The shadow points North-East.\nHead to the LEFT bench — scan the marker on the back of the backrest!',
+      hud: 'Stage 1 · Pine Tree', hint: 'Scan the pine tree marker ✦'
     },
     2: {
-      icon: '🪑',
-      stageLabel: 'Stage Two · Cooperation',
-      title: 'Left Half of the Sky',
-      story: "You found the left bench! Behind the backrest, a half-constellation is hidden. Describe what you see to Player B — together you will name it.",
+      icon: '🪑', stageLabel: 'Stage Two · Cooperation', title: 'Left Half of the Sky',
+      story: "You found the left bench! Behind the backrest, half a constellation is hidden. Describe what you see to Player B — together you will name it.",
       clueLabel: 'Your half of the constellation',
       clueClass: 'ca',
-      clue: `You see the LEFT half of a constellation:\n\n· One very bright star — top-left corner\n· One slightly smaller star — just to its right\n· One star in the middle-left (part of a horizontal row)\n· One star at the bottom-left\n\nDescribe ONLY positions — e.g. "bright star top-left, another star right of it, one in the middle-left row, one bottom-left."\nDo NOT say the constellation name.`,
+      clue: `You see the LEFT half of a constellation:\n\n· One very bright star — top-left corner\n· One slightly smaller star — just to its right\n· One star in the middle-left (part of a horizontal row)\n· One star at the bottom-left\n\nDescribe ONLY positions to Player B.\nDo NOT say the constellation name.`,
       taskLabel: 'Player A · Your Task',
       task: 'Describe your star positions to Player B (no names!).\nListen to Player B describe their half.\nLook at the printed reference card.\nTogether, identify the full constellation and type its name below.',
-      puzzle: 'text',
-      correct: 'orion',
-      successMsg: 'Orion! You identified the constellation!\nNow both guardians walk to the CENTRE of the lawn.',
-      hud: 'Stage 2 · Left Bench',
-      hint: 'Go to the left bench — scan back ✦'
+      puzzle: 'text', correct: 'orion',
+      successMsg: 'Orion! Constellation identified!\nNow both guardians walk to the CENTRE of the lawn.',
+      hud: 'Stage 2 · Left Bench', hint: 'Go to the left bench — scan back ✦'
     }
   },
   B: {
     1: {
-      icon: '🪵',
-      stageLabel: 'Stage One · Scout',
-      title: 'Memory of the Storm',
-      story: "This fallen tree holds the second clue. As a scout, you must read the physical evidence — the direction the tree fell tells you where the storm came from.",
-      clueLabel: "Field Observation — stump evidence",
+      icon: '🪵', stageLabel: 'Stage One · Scout', title: 'Memory of the Storm',
+      story: "This fallen tree holds the second clue. As a scout, read the physical evidence — the direction the tree fell tells you where the storm came from.",
+      clueLabel: "Field observation — stump evidence",
       clueClass: 'cb',
       clue: `The tree fell toward the South-West.\nThe cracks in the stump face South-West.\nThis means the storm struck from the North-East.\n\nThe fairy whispers:\n"The second fragment was blown to the RIGHT bench.\nWhen a storm comes from the North-East,\nit scatters things toward the South-West."`,
       taskLabel: 'Player B · Your Task',
-      task: 'Read the field observation above carefully.\nWork out the direction the storm came FROM, then select it below.\nThis confirms where your next marker is hidden.',
-      puzzle: 'direction',
-      correct: 'North-East ↗',
-      successMsg: 'Correct! The storm came from the North-East.\nThe RIGHT bench is your next destination — scan the marker on the back of the backrest!',
-      hud: 'Stage 1 · Dead Stump',
-      hint: 'Scan the dead stump marker ✦'
+      task: 'Read the field observation carefully.\nWork out the direction the storm came FROM, then select it below.\nThis confirms where your next marker is hidden.',
+      puzzle: 'direction', correct: 'North-East ↗',
+      successMsg: 'Correct! The storm came from the North-East.\nHead to the RIGHT bench — scan the marker on the back of the backrest!',
+      hud: 'Stage 1 · Dead Stump', hint: 'Scan the dead stump marker ✦'
     },
     2: {
-      icon: '🪑',
-      stageLabel: 'Stage Two · Cooperation',
-      title: 'Right Half of the Sky',
-      story: "You found the right bench! Behind the backrest, a half-constellation is hidden. Describe what you see to Player A — together you will name it.",
+      icon: '🪑', stageLabel: 'Stage Two · Cooperation', title: 'Right Half of the Sky',
+      story: "You found the right bench! Behind the backrest, half a constellation is hidden. Describe what you see to Player A — together you will name it.",
       clueLabel: 'Your half of the constellation',
       clueClass: 'cb',
-      clue: `You see the RIGHT half of a constellation:\n\n· Two stars side by side in the middle (part of a horizontal row)\n· One very bright star — bottom-right corner\n· One star going up the right side\n· One smaller star — top-right area\n\nDescribe ONLY positions — e.g. "two stars in the middle row, bright star bottom-right, one going up the right, one top-right."\nDo NOT say the constellation name.`,
+      clue: `You see the RIGHT half of a constellation:\n\n· Two stars side by side in the middle (part of a horizontal row)\n· One very bright star — bottom-right corner\n· One star going up the right side\n· One smaller star — top-right area\n\nDescribe ONLY positions to Player A.\nDo NOT say the constellation name.`,
       taskLabel: 'Player B · Your Task',
       task: 'Describe your star positions to Player A (no names!).\nListen to Player A describe their half.\nLook at the printed reference card.\nTogether, identify the full constellation and type its name below.',
-      puzzle: 'text',
-      correct: 'orion',
-      successMsg: 'Orion! You identified the constellation!\nNow both guardians walk to the CENTRE of the lawn.',
-      hud: 'Stage 2 · Right Bench',
-      hint: 'Go to the right bench — scan back ✦'
+      puzzle: 'text', correct: 'orion',
+      successMsg: 'Orion! Constellation identified!\nNow both guardians walk to the CENTRE of the lawn.',
+      hud: 'Stage 2 · Right Bench', hint: 'Go to the right bench — scan back ✦'
     }
   },
   finale: {
-    icon: '🏡',
-    stageLabel: 'Final Stage · Both Players',
-    title: 'Rebuilding the Village',
-    story: "All three fragments gathered! Both guardians stand at the centre of the lawn. Recall the runes you each found across both stages and arrange them in the correct order.",
+    icon: '🏡', stageLabel: 'Final Stage · Both Players', title: 'Rebuilding the Village',
+    story: "All fragments gathered! Both guardians stand at the centre of the lawn. Recall the runes you each found and arrange them in the correct order.",
     clueLabel: 'The three runes you collected',
     clueClass: 'ca',
-    clue: `The fairy left three runes scattered across the garden.\n\nThink back:\n· Which rune did you encounter first?\n· Which came second?\n· Which was last?\n\nTalk to each other — Player A and Player B may have found different runes at different times. Together you can work out the correct order.`,
+    clue: `The fairy left three runes scattered across the garden.\n\nThink back:\n· Which rune did you encounter first?\n· Which came second?\n· Which was last?\n\nTalk to each other — Player A and Player B may have found different runes. Together work out the correct order.`,
     taskLabel: 'Both Players · Final Task',
     task: 'Walk to the centre of the lawn together.\nDiscuss with each other: when did you each first see a rune?\nArrange the three runes from first to last.\nBoth players confirm on their own phones.',
-    puzzle: 'order',
-    correctOrder: ['🌿', '🔮', '🍄'],
-    successMsg: '',
-    hud: 'Final Stage · Lawn Centre',
-    hint: 'Walk to the centre of the lawn ✦'
+    puzzle: 'order', correctOrder: ['🌿', '🔮', '🍄'],
+    successMsg: '', hud: 'Final Stage · Lawn Centre', hint: 'Walk to the centre of the lawn ✦'
   }
 };
 
@@ -604,7 +486,7 @@ const TARGET_MAP = [
 ];
 
 // ══════════════════════════════════════════
-// FAIRY HINTS
+// FAIRY
 // ══════════════════════════════════════════
 const HINTS = {
   A: {
@@ -618,9 +500,11 @@ const HINTS = {
     3: ["Walk to the centre of the lawn!", "Meet Player A in the middle of the grass!"]
   }
 };
+
 let bubbleTimer = null;
+
 function fairyTap() {
-  bootAudio(); SFX.click();
+  SFX.click();
   const hs = S.role ? HINTS[S.role][Math.min(S.stage, 3)] : null;
   if (!hs) return;
   showBubble(hs[Math.floor(Math.random() * hs.length)]);
@@ -650,8 +534,7 @@ function updateStars() {
 // ROLE SELECT
 // ══════════════════════════════════════════
 function pickRole(role) {
-  bootAudio();  // Must be first — synchronous inside tap handler
-  SFX.select();
+  SFX.select();   // creates fresh AudioContext synchronously in this tap
   S.role = role;
   document.getElementById('role-screen').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -662,7 +545,7 @@ function pickRole(role) {
   document.getElementById('fairy').classList.remove('hidden');
   SFX.appear();
   showHint();
-  setTimeout(fairyTap, 5000);
+  setTimeout(fairyTap, 6000);
   startAR();
 }
 
@@ -674,7 +557,7 @@ async function startAR() {
     const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     s.getTracks().forEach(t => t.stop());
   } catch(e) {
-    alert('Camera access required. Please allow camera in Safari Settings.');
+    alert('Camera access required. Please allow camera in Safari Settings and reload.');
     return;
   }
   const scene = document.getElementById('ar-scene');
@@ -689,7 +572,7 @@ async function startAR() {
 }
 
 // ══════════════════════════════════════════
-// HINT TEXT
+// HINT BAR
 // ══════════════════════════════════════════
 function showHint() {
   const el = document.getElementById('hint');
@@ -702,7 +585,7 @@ function showHint() {
 function hideHint() { document.getElementById('hint').classList.add('hidden'); }
 
 // ══════════════════════════════════════════
-// TARGET LISTENERS
+// AR TARGET LISTENERS
 // ══════════════════════════════════════════
 function setupTargets() {
   TARGET_MAP.forEach(t => {
@@ -710,7 +593,8 @@ function setupTargets() {
     if (!el) return;
     el.addEventListener('targetFound', () => {
       if (t.role === S.role && t.stage === S.stage && !S.solved) {
-        resumeAC(); SFX.scan(); fairyAnim('fairy-happy');
+        SFX.scan();
+        fairyAnim('fairy-happy');
         flash('#9fcfa0', 300);
         showPopup();
       }
@@ -723,23 +607,17 @@ function setupTargets() {
 // ══════════════════════════════════════════
 function showPopup() {
   const c = S.stage === 3 ? CONTENT.finale : CONTENT[S.role][S.stage];
-  document.getElementById('p-icon').textContent = c.icon;
-  document.getElementById('p-slabel').textContent = c.stageLabel;
-  document.getElementById('p-title').textContent = c.title;
-  document.getElementById('p-story').textContent = c.story;
-
-  // Clue box
-  const cw = document.getElementById('p-clue-wrap');
-  cw.innerHTML = `<div class="p-clue ${c.clueClass}"><div class="p-clue-label">${c.clueLabel}</div><div class="p-clue-text">${c.clue}</div></div>`;
-
-  // Role tag
+  document.getElementById('p-icon').textContent     = c.icon;
+  document.getElementById('p-slabel').textContent   = c.stageLabel;
+  document.getElementById('p-title').textContent    = c.title;
+  document.getElementById('p-story').textContent    = c.story;
+  document.getElementById('p-clue-wrap').innerHTML  =
+    `<div class="p-clue ${c.clueClass}"><div class="p-clue-label">${c.clueLabel}</div><div class="p-clue-text">${c.clue}</div></div>`;
   const rt = document.getElementById('p-rtag');
   if (S.stage === 3) { rt.textContent = 'Both Players'; rt.className = 'p-rtag both'; }
-  else { rt.textContent = 'Player ' + S.role; rt.className = 'p-rtag ' + S.role.toLowerCase(); }
-
+  else               { rt.textContent = 'Player ' + S.role; rt.className = 'p-rtag ' + S.role.toLowerCase(); }
   document.getElementById('p-task-label').textContent = c.taskLabel;
-  document.getElementById('p-task-text').textContent = c.task;
-
+  document.getElementById('p-task-text').textContent  = c.task;
   buildPuzzle(c);
   hideHint();
   document.getElementById('popup').classList.add('show');
@@ -750,17 +628,18 @@ function hidePopup() { document.getElementById('popup').classList.remove('show')
 // PUZZLE BUILDERS
 // ══════════════════════════════════════════
 function buildPuzzle(c) {
-  const pz = document.getElementById('pz');
+  const pz  = document.getElementById('pz');
   const btn = document.getElementById('btn-ok');
   pz.innerHTML = ''; S.selDir = null;
   btn.className = 'btn-ok off';
 
   if (c.puzzle === 'direction') {
-    const dirs = ['North ↑', 'South ↓', 'North-East ↗', 'South-West ↙'];
-    pz.innerHTML = `<div class="pz"><div class="pz-label">Select the direction from the clue above</div><div class="dir-grid">${dirs.map(d => `<button class="dir-btn" onclick="selDir(this,'${d}')">${d}</button>`).join('')}</div></div>`;
+    const dirs = ['North ↑','South ↓','North-East ↗','South-West ↙'];
+    pz.innerHTML = `<div class="pz"><div class="pz-label">Select the direction from the clue above</div><div class="dir-grid">${
+      dirs.map(d => `<button class="dir-btn" onclick="selDir(this,'${d}')">${d}</button>`).join('')
+    }</div></div>`;
 
   } else if (c.puzzle === 'text') {
-    // Show star diagram based on role
     const diagram = S.role === 'A' ? buildStarLeft() : buildStarRight();
     pz.innerHTML = diagram + `<div class="pz"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Orion" oninput="chkTxt()"></div>`;
 
@@ -772,97 +651,80 @@ function buildPuzzle(c) {
 
 function buildStarLeft() {
   return `<div class="p-clue ca" style="margin-bottom:11px">
-    <div class="p-clue-label">Your half — describe these stars to Player B</div>
-    <svg viewBox="0 0 200 160" style="width:100%;background:rgba(0,0,0,.4);border-radius:8px;margin-bottom:8px">
-      <!-- dashed split line -->
-      <line x1="100" y1="0" x2="100" y2="160" stroke="rgba(200,151,58,.3)" stroke-width="1" stroke-dasharray="5,4"/>
-      <text x="50" y="12" text-anchor="middle" font-size="8" fill="rgba(100,160,220,.7)" font-family="serif">YOUR HALF</text>
-      <text x="150" y="12" text-anchor="middle" font-size="8" fill="rgba(100,100,100,.5)" font-family="serif">PLAYER B</text>
-      <!-- Betelgeuse (top-left, very bright) -->
-      <circle cx="30" cy="38" r="9" fill="none" stroke="#f0e8d0" stroke-width="2"/>
-      <circle cx="30" cy="38" r="5" fill="#f0e8d0"/>
-      <text x="30" y="25" text-anchor="middle" font-size="7" fill="#c8973a" font-family="serif">Betelgeuse</text>
-      <!-- Bellatrix (top-right-of-left) -->
-      <circle cx="72" cy="30" r="6" fill="none" stroke="#d0d0c0" stroke-width="1.5"/>
-      <circle cx="72" cy="30" r="3.5" fill="#d0d0c0"/>
-      <text x="72" y="20" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">Bellatrix</text>
-      <!-- Left belt star -->
-      <circle cx="40" cy="85" r="7" fill="none" stroke="#d8d8d0" stroke-width="1.8"/>
-      <circle cx="40" cy="85" r="4" fill="#d8d8d0"/>
-      <text x="22" y="98" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">Belt L</text>
-      <!-- Saiph (bottom-left foot) -->
-      <circle cx="28" cy="130" r="6" fill="none" stroke="#c8c8c0" stroke-width="1.5"/>
-      <circle cx="28" cy="130" r="3.5" fill="#c8c8c0"/>
-      <text x="28" y="145" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">Saiph</text>
-      <!-- Connecting lines -->
-      <line x1="30" y1="47" x2="72" y2="30" stroke="rgba(240,232,208,.35)" stroke-width="1"/>
-      <line x1="72" y1="36" x2="40" y2="78" stroke="rgba(240,232,208,.35)" stroke-width="1"/>
-      <line x1="40" y1="92" x2="28" y2="124" stroke="rgba(240,232,208,.35)" stroke-width="1"/>
-      <!-- Faded right half -->
-      <circle cx="130" cy="35" r="5" fill="rgba(100,100,100,.25)" stroke="rgba(100,100,100,.2)" stroke-width="1"/>
-      <circle cx="65" cy="85" r="5" fill="rgba(100,100,100,.2)" stroke="rgba(100,100,100,.15)" stroke-width="1"/>
-      <circle cx="80" cy="85" r="5" fill="rgba(100,100,100,.2)" stroke="rgba(100,100,100,.15)" stroke-width="1"/>
-      <circle cx="122" cy="130" r="8" fill="rgba(100,100,100,.25)" stroke="rgba(100,100,100,.2)" stroke-width="1"/>
+    <div class="p-clue-label">Your half — describe positions to Player B</div>
+    <svg viewBox="0 0 200 165" style="width:100%;background:rgba(0,0,0,.45);border-radius:8px;margin-bottom:8px">
+      <line x1="100" y1="0" x2="100" y2="165" stroke="rgba(200,151,58,.3)" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="50" y="13" text-anchor="middle" font-size="8" fill="rgba(100,160,220,.7)" font-family="serif">YOUR HALF</text>
+      <text x="150" y="13" text-anchor="middle" font-size="8" fill="rgba(80,80,80,.5)" font-family="serif">PLAYER B</text>
+      <circle cx="30" cy="40" r="9" fill="none" stroke="#f0e8d0" stroke-width="2"/>
+      <circle cx="30" cy="40" r="5" fill="#f0e8d0"/>
+      <text x="30" y="27" text-anchor="middle" font-size="7" fill="#c8973a" font-family="serif">very bright</text>
+      <circle cx="72" cy="32" r="6" fill="none" stroke="#ccc" stroke-width="1.5"/>
+      <circle cx="72" cy="32" r="3" fill="#ccc"/>
+      <circle cx="42" cy="90" r="7" fill="none" stroke="#ddd" stroke-width="1.8"/>
+      <circle cx="42" cy="90" r="3.5" fill="#ddd"/>
+      <text x="22" y="104" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">row star</text>
+      <circle cx="28" cy="135" r="6" fill="none" stroke="#ccc" stroke-width="1.5"/>
+      <circle cx="28" cy="135" r="3" fill="#ccc"/>
+      <line x1="30" y1="49" x2="72" y2="38" stroke="rgba(240,232,208,.3)" stroke-width="1"/>
+      <line x1="72" y1="38" x2="42" y2="83" stroke="rgba(240,232,208,.3)" stroke-width="1"/>
+      <line x1="42" y1="97" x2="28" y2="129" stroke="rgba(240,232,208,.3)" stroke-width="1"/>
+      <circle cx="128" cy="38" r="4" fill="rgba(80,80,80,.25)"/>
+      <circle cx="65" cy="90" r="4" fill="rgba(80,80,80,.2)"/>
+      <circle cx="80" cy="88" r="4" fill="rgba(80,80,80,.2)"/>
+      <circle cx="122" cy="135" r="7" fill="rgba(80,80,80,.22)"/>
     </svg>
-    <div style="font-size:10px;color:#888;line-height:1.6;font-style:italic">Say to Player B: "I have a very bright star top-left (Betelgeuse), one smaller star next to it, one belt star middle-left, and a foot star bottom-left."</div>
+    <div style="font-size:10px;color:#888;line-height:1.6;font-style:italic">Tell Player B: "I see a very bright star top-left, a smaller star to its right, one star in the middle-left row, and a star at the bottom-left."</div>
   </div>`;
 }
 
 function buildStarRight() {
   return `<div class="p-clue cb" style="margin-bottom:11px">
-    <div class="p-clue-label">Your half — describe these stars to Player A</div>
-    <svg viewBox="0 0 200 160" style="width:100%;background:rgba(0,0,0,.4);border-radius:8px;margin-bottom:8px">
-      <!-- dashed split line -->
-      <line x1="100" y1="0" x2="100" y2="160" stroke="rgba(200,151,58,.3)" stroke-width="1" stroke-dasharray="5,4"/>
-      <text x="50" y="12" text-anchor="middle" font-size="8" fill="rgba(100,100,100,.5)" font-family="serif">PLAYER A</text>
-      <text x="150" y="12" text-anchor="middle" font-size="8" fill="rgba(180,100,220,.7)" font-family="serif">YOUR HALF</text>
-      <!-- Faded left half -->
-      <circle cx="30" cy="38" r="8" fill="rgba(100,100,100,.25)" stroke="rgba(100,100,100,.2)" stroke-width="1"/>
-      <circle cx="72" cy="30" r="5" fill="rgba(100,100,100,.2)" stroke="rgba(100,100,100,.15)" stroke-width="1"/>
-      <circle cx="40" cy="85" r="5" fill="rgba(100,100,100,.2)" stroke="rgba(100,100,100,.15)" stroke-width="1"/>
-      <circle cx="28" cy="130" r="5" fill="rgba(100,100,100,.2)" stroke="rgba(100,100,100,.15)" stroke-width="1"/>
-      <!-- Meissa/head area -->
-      <circle cx="130" cy="22" r="5" fill="none" stroke="#c0c0b8" stroke-width="1.4"/>
-      <circle cx="130" cy="22" r="3" fill="#c0c0b8"/>
-      <text x="150" y="18" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">Head</text>
-      <!-- Bellatrix mirror -->
-      <circle cx="128" cy="38" r="6" fill="none" stroke="#d0d0c0" stroke-width="1.5"/>
-      <circle cx="128" cy="38" r="3.5" fill="#d0d0c0"/>
-      <!-- Middle belt -->
-      <circle cx="65" cy="85" r="6" fill="none" stroke="#d8d8d0" stroke-width="1.6"/>
-      <circle cx="65" cy="85" r="3.5" fill="#d8d8d0"/>
-      <!-- Right belt -->
-      <circle cx="80" cy="83" r="6" fill="none" stroke="#d8d8d0" stroke-width="1.6"/>
-      <circle cx="80" cy="83" r="3.5" fill="#d8d8d0"/>
-      <text x="85" y="98" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">Belt R</text>
-      <!-- Rigel (bottom-right, very bright) -->
-      <circle cx="160" cy="130" r="10" fill="none" stroke="#f0f0f8" stroke-width="2"/>
-      <circle cx="160" cy="130" r="6" fill="#f0f0f8"/>
-      <text x="160" y="148" text-anchor="middle" font-size="7" fill="#c8973a" font-family="serif">Rigel</text>
-      <!-- Connecting lines -->
-      <line x1="128" y1="44" x2="80" y2="77" stroke="rgba(240,240,248,.35)" stroke-width="1"/>
-      <line x1="65" y1="91" x2="80" y2="91" stroke="rgba(240,240,248,.4)" stroke-width="1.5"/>
-      <line x1="80" y1="89" x2="160" y2="122" stroke="rgba(240,240,248,.35)" stroke-width="1"/>
+    <div class="p-clue-label">Your half — describe positions to Player A</div>
+    <svg viewBox="0 0 200 165" style="width:100%;background:rgba(0,0,0,.45);border-radius:8px;margin-bottom:8px">
+      <line x1="100" y1="0" x2="100" y2="165" stroke="rgba(200,151,58,.3)" stroke-width="1" stroke-dasharray="5,4"/>
+      <text x="50" y="13" text-anchor="middle" font-size="8" fill="rgba(80,80,80,.5)" font-family="serif">PLAYER A</text>
+      <text x="150" y="13" text-anchor="middle" font-size="8" fill="rgba(180,100,220,.7)" font-family="serif">YOUR HALF</text>
+      <circle cx="30" cy="40" r="8" fill="rgba(80,80,80,.22)"/>
+      <circle cx="72" cy="32" r="5" fill="rgba(80,80,80,.18)"/>
+      <circle cx="42" cy="90" r="5" fill="rgba(80,80,80,.18)"/>
+      <circle cx="28" cy="135" r="5" fill="rgba(80,80,80,.18)"/>
+      <circle cx="130" cy="30" r="5" fill="none" stroke="#ccc" stroke-width="1.5"/>
+      <circle cx="130" cy="30" r="2.5" fill="#ccc"/>
+      <circle cx="128" cy="46" r="6" fill="none" stroke="#ccc" stroke-width="1.5"/>
+      <circle cx="128" cy="46" r="3" fill="#ccc"/>
+      <circle cx="65" cy="90" r="6" fill="none" stroke="#ddd" stroke-width="1.8"/>
+      <circle cx="65" cy="90" r="3" fill="#ddd"/>
+      <circle cx="80" cy="88" r="6" fill="none" stroke="#ddd" stroke-width="1.8"/>
+      <circle cx="80" cy="88" r="3" fill="#ddd"/>
+      <text x="88" y="103" text-anchor="middle" font-size="7" fill="#9fcfa0" font-family="serif">row stars</text>
+      <circle cx="160" cy="135" r="10" fill="none" stroke="#f0f0f8" stroke-width="2"/>
+      <circle cx="160" cy="135" r="6" fill="#f0f0f8"/>
+      <text x="160" y="152" text-anchor="middle" font-size="7" fill="#c8973a" font-family="serif">very bright</text>
+      <line x1="128" y1="52" x2="80" y2="82" stroke="rgba(240,240,248,.3)" stroke-width="1"/>
+      <line x1="65" y1="96" x2="80" y2="96" stroke="rgba(240,240,248,.35)" stroke-width="1.5"/>
+      <line x1="80" y1="94" x2="160" y2="127" stroke="rgba(240,240,248,.3)" stroke-width="1"/>
     </svg>
-    <div style="font-size:10px;color:#888;line-height:1.6;font-style:italic">Say to Player A: "I have a very bright star bottom-right (Rigel), two belt stars in a row middle-right, and stars going up the right side toward the top."</div>
+    <div style="font-size:10px;color:#888;line-height:1.6;font-style:italic">Tell Player A: "I see two stars side by side in the middle row, a very bright star at the bottom-right, and stars going up the right side."</div>
   </div>`;
 }
 
 function buildOrder() {
   const pz = document.getElementById('pz');
+  const choices = ['🌿','🔮','🍄'];
   const slots = S.finaleSlots.map((r,i) =>
     `<div class="o-slot${r?' on':''}" onclick="clrSlot(${i})">${r||''}</div>`).join('');
-  const runes = ['🌿','🍄','🔮'].map(r =>
+  const runes = choices.map(r =>
     `<div class="rune${S.finaleSlots.includes(r)?' used':''}" onclick="putRune('${r}')">${r}</div>`).join('');
-  pz.innerHTML = `<div class="pz"><div class="pz-label">Arrange runes in the order collected</div><div class="order-slots">${slots}</div><div class="rune-row">${runes}</div></div>`;
+  pz.innerHTML = `<div class="pz"><div class="pz-label">Arrange runes in the order you collected them</div><div class="order-slots">${slots}</div><div class="rune-row">${runes}</div></div>`;
   document.getElementById('btn-ok').className = S.finaleSlots.includes(null) ? 'btn-ok off' : 'btn-ok';
 }
 
 // ══════════════════════════════════════════
-// PUZZLE INTERACTIONS
+// INTERACTIONS
 // ══════════════════════════════════════════
 function selDir(btn, dir) {
-  bootAudio(); SFX.click();
+  SFX.click();
   document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('on'));
   btn.classList.add('on'); S.selDir = dir;
   document.getElementById('btn-ok').className = 'btn-ok';
@@ -872,20 +734,17 @@ function chkTxt() {
   document.getElementById('btn-ok').className = v ? 'btn-ok' : 'btn-ok off';
 }
 function putRune(r) {
-  bootAudio(); SFX.click();
+  SFX.click();
   const i = S.finaleSlots.indexOf(null);
   if (i === -1) return;
   S.finaleSlots[i] = r; buildOrder();
 }
-function clrSlot(i) {
-  S.finaleSlots[i] = null; buildOrder();
-}
+function clrSlot(i) { S.finaleSlots[i] = null; buildOrder(); }
 
 // ══════════════════════════════════════════
-// CONFIRM ANSWER
+// CONFIRM
 // ══════════════════════════════════════════
 function confirm_answer() {
-  bootAudio();
   const c = S.stage === 3 ? CONTENT.finale : CONTENT[S.role][S.stage];
   if (!c) return;
 
@@ -897,8 +756,8 @@ function confirm_answer() {
       showWait('Stage 1 Complete! 🌿', c.successMsg);
     } else {
       SFX.wrong(); flash('#cc3333', 250); fairyAnim('fairy-sad');
-      document.querySelectorAll('.dir-btn').forEach(b => { if(b.classList.contains('on')) b.classList.add('bad'); });
-      setTimeout(() => loseStar('Wrong direction!\nYou lose one energy star.\nRe-read the clue carefully and try again.'), 400);
+      document.querySelectorAll('.dir-btn').forEach(b => { if (b.classList.contains('on')) b.classList.add('bad'); });
+      setTimeout(() => loseStar('Wrong direction!\nYou lose one energy star.\nRe-read the clue and try again.'), 400);
     }
 
   } else if (c.puzzle === 'text') {
@@ -910,20 +769,20 @@ function confirm_answer() {
       showWait('Stage 2 Complete! ✨', c.successMsg);
     } else {
       SFX.wrong(); flash('#cc3333', 250); fairyAnim('fairy-sad');
-      loseStar("That's not the right constellation!\nYou lose one energy star.\nKeep describing your stars to each other.");
+      loseStar("That\'s not it!\nYou lose one energy star.\nKeep describing your stars to each other.");
       document.getElementById('ans').value = '';
       document.getElementById('btn-ok').className = 'btn-ok off';
     }
 
   } else if (c.puzzle === 'order') {
-    const ok = ['🌿', '🍄', '🔮'];
+    const ok = ['🌿','🔮','🍄'];
     if (S.finaleSlots.every((r,i) => r === ok[i])) {
       SFX.victory(); victoryBurst(); flash('#c8973a', 500); fairyAnim('fairy-happy');
       setTimeout(showVictory, 800);
     } else {
       SFX.wrong(); flash('#cc3333', 250); fairyAnim('fairy-sad');
       loseStar('Wrong order!\nYou lose one energy star.\nRecall when you found each rune.');
-      S.finaleSlots = [null, null, null]; buildOrder();
+      S.finaleSlots = [null,null,null]; buildOrder();
     }
   }
 }
@@ -932,22 +791,21 @@ function confirm_answer() {
 // WAIT SCREEN
 // ══════════════════════════════════════════
 function showWait(title, text) {
-  bootAudio(); SFX.stage();
+  SFX.stage();
   document.getElementById('wt-title').textContent = title;
-  document.getElementById('wt-text').textContent = text;
+  document.getElementById('wt-text').textContent  = text;
   document.getElementById('wait-screen').classList.remove('hidden');
 }
 function dismissWait() {
-  bootAudio(); SFX.click();
+  SFX.click();
   document.getElementById('wait-screen').classList.add('hidden');
   S.stage++; S.solved = false;
   if (S.stage === 3) {
     document.getElementById('hud-stage').textContent = CONTENT.finale.hud;
     showHint();
-    setTimeout(() => { showPopup(); }, 600);
+    setTimeout(showPopup, 600);
   } else {
-    const c = CONTENT[S.role][S.stage];
-    document.getElementById('hud-stage').textContent = c.hud;
+    document.getElementById('hud-stage').textContent = CONTENT[S.role][S.stage].hud;
     showHint();
   }
 }
@@ -977,20 +835,20 @@ function loseStar(msg) {
 function showGameOver() {
   hidePopup();
   document.getElementById('wait-screen').classList.add('hidden');
-  document.getElementById('res-icon').textContent = '😔';
+  document.getElementById('res-icon').textContent  = '😔';
   document.getElementById('res-title').textContent = 'The Fairy Has Fainted…';
-  document.getElementById('res-text').textContent = "Energy spent — but there's still a flicker of hope. Set out again, Guardians!";
+  document.getElementById('res-text').textContent  = "Energy spent — but there\'s still a flicker of hope. Set out again, Guardians!";
   document.getElementById('result-screen').classList.remove('hidden');
 }
 function showVictory() {
   hidePopup();
-  document.getElementById('res-icon').textContent = '✨';
+  document.getElementById('res-icon').textContent  = '✨';
   document.getElementById('res-title').textContent = 'Village Rebuilt!';
-  document.getElementById('res-text').textContent = `You did it, Guardians! The fairy village is restored. Stars remaining: ${S.stars} ⭐`;
+  document.getElementById('res-text').textContent  = `You did it, Guardians! The fairy village is restored. Stars remaining: ${S.stars} ⭐`;
   document.getElementById('result-screen').classList.remove('hidden');
 }
 function resetGame() {
-  bootAudio(); SFX.click();
+  SFX.click();
   Object.assign(S, { role:null, stars:3, stage:1, solved:false, selDir:null, finaleSlots:[null,null,null], penaltyActive:false });
   updateStars();
   ['result-screen','wait-screen'].forEach(id => document.getElementById(id).classList.add('hidden'));
