@@ -862,5 +862,363 @@ function resetGame() {
   clearTimeout(bubbleTimer);
 }
 </script>
+
+  
+
+
+  <!-- 核心 JavaScript 逻辑（补全的代码放在这里） -->
+  <script>
+    // 1. 游戏状态管理（先定义核心状态变量）
+    const S = {
+      role: '', // 'A' 或 'B'
+      stage: 1,
+      solved: false,
+      stars: 3,
+      penaltyActive: false
+    };
+
+    // 2. 内容配置（根据角色/阶段定义弹窗内容）
+    const CONTENT = {
+      A: {
+        1: {
+          icon: '🌲',
+          stageLabel: 'Stage One',
+          title: 'The Ancient Tree',
+          story: 'The pine tree whispers of a path to the left bench — follow its direction to find the first clue.',
+          clueClass: 'ca',
+          clueLabel: 'Clue',
+          clue: 'The tree’s roots point ← (west) — select this direction to proceed.',
+          taskLabel: 'Your Task',
+          task: 'Select the correct direction the tree is pointing',
+          correct: 'west' // 方向谜题的正确答案
+        },
+        2: {
+          // 补充 Stage 2 Player A 的配置
+          icon: '🪑',
+          stageLabel: 'Stage Two',
+          title: 'The Left Bench',
+          story: 'The bench holds a carved rune — enter the word "orion" to unlock the next step.',
+          clueClass: 'cb',
+          clueLabel: 'Clue',
+          clue: 'The rune spells "orion" — type this exactly (lowercase) to proceed.',
+          taskLabel: 'Your Task',
+          task: 'Type the word carved into the bench',
+          correct: 'orion' // 文本输入的正确答案
+        }
+      },
+      B: {
+        1: {
+          icon: '🪵',
+          stageLabel: 'Stage One',
+          title: 'The Dead Stump',
+          story: 'The stump creaks of a path to the right bench — follow its direction to find the first clue.',
+          clueClass: 'ca',
+          clueLabel: 'Clue',
+          clue: 'The stump’s rings point → (east) — select this direction to proceed.',
+          taskLabel: 'Your Task',
+          task: 'Select the correct direction the stump is pointing',
+          correct: 'east'
+        },
+        2: {
+          // 补充 Stage 2 Player B 的配置
+          icon: '🪑',
+          stageLabel: 'Stage Two',
+          title: 'The Right Bench',
+          story: 'The bench has 3 runes — arrange them in order: 🔥 → 🌿 → ✨',
+          clueClass: 'cb',
+          clueLabel: 'Clue',
+          clue: 'Rune order: Fire → Nature → Star',
+          taskLabel: 'Your Task',
+          task: 'Drag the runes into the correct order',
+          correct: ['🔥', '🌿', '✨'] // 排序谜题的正确答案
+        }
+      },
+      finale: {
+        icon: '✨',
+        stageLabel: 'Final Stage',
+        title: 'Village Rebuilt!',
+        story: 'The storm has passed — the fairy village is whole again. Thank you, Guardians!',
+        clueClass: 'ca',
+        clueLabel: 'Victory',
+        clue: 'You’ve restored balance to the garden.',
+        taskLabel: 'Your Journey',
+        task: 'Celebrate with the fairies — your adventure is complete!'
+      }
+    };
+
+    // 3. 补全 showPopup 函数（核心渲染弹窗）
+    function showPopup() {
+      const c = S.stage === 3 ? CONTENT.finale : CONTENT[S.role][S.stage];
+      document.getElementById('p-icon').textContent = c.icon;
+      document.getElementById('p-slabel').textContent = c.stageLabel;
+      document.getElementById('p-title').textContent = c.title;
+      document.getElementById('p-story').textContent = c.story;
+      
+      // 渲染线索区域
+      document.getElementById('p-clue-wrap').innerHTML = `
+        <div class="p-clue ${c.clueClass}">
+          <div class="p-clue-label">${c.clueLabel}</div>
+          <div class="p-clue-text">${c.clue}</div>
+        </div>
+      `;
+      
+      // 渲染任务区域
+      document.getElementById('p-task-label').textContent = c.taskLabel;
+      document.getElementById('p-task-text').textContent = c.task;
+      
+      // 渲染对应谜题（方向/文本/排序）
+      renderPuzzle(c);
+      
+      // 显示弹窗 + 激活确认按钮
+      document.getElementById('popup').classList.add('show');
+      hideHint();
+      document.getElementById('btn-ok').classList.remove('off');
+    }
+
+    // 4. 辅助函数：根据阶段渲染对应谜题
+    function renderPuzzle(content) {
+      const pzEl = document.getElementById('pz');
+      pzEl.innerHTML = ''; // 清空原有谜题
+      
+      // 阶段1：方向谜题（A/B 角色）
+      if (S.stage === 1) {
+        pzEl.innerHTML = `
+          <div class="pz">
+            <div class="pz-label">Select Direction</div>
+            <div class="dir-grid">
+              <div class="dir-btn" onclick="selectDir('north')">↑ North</div>
+              <div class="dir-btn" onclick="selectDir('east')">→ East</div>
+              <div class="dir-btn" onclick="selectDir('south')">↓ South</div>
+              <div class="dir-btn" onclick="selectDir('west')">← West</div>
+            </div>
+          </div>
+        `;
+      }
+      
+      // 阶段2：文本输入（A角色）/ 排序谜题（B角色）
+      if (S.stage === 2) {
+        if (S.role === 'A') {
+          // Player A：文本输入谜题
+          pzEl.innerHTML = `
+            <div class="pz">
+              <div class="pz-label">Enter the Word</div>
+              <input type="text" class="ans-input" id="text-ans" placeholder="Type here...">
+            </div>
+          `;
+        } else {
+          // Player B：符文排序谜题
+          pzEl.innerHTML = `
+            <div class="pz">
+              <div class="pz-label">Arrange Runes</div>
+              <div class="order-slots">
+                <div class="o-slot" id="slot1" onclick="selectSlot(1)"></div>
+                <div class="o-slot" id="slot2" onclick="selectSlot(2)"></div>
+                <div class="o-slot" id="slot3" onclick="selectSlot(3)"></div>
+              </div>
+              <div class="rune-row">
+                <div class="rune" id="rune1" onclick="pickRune('🔥')">🔥</div>
+                <div class="rune" id="rune2" onclick="pickRune('🌿')">🌿</div>
+                <div class="rune" id="rune3" onclick="pickRune('✨')">✨</div>
+              </div>
+            </div>
+          `;
+        }
+      }
+    }
+
+    // 5. 补全核心交互函数（方向选择/答案确认/等待关闭/重置游戏等）
+    let selectedDir = ''; // 存储选中的方向
+    let selectedSlot = 0; // 存储选中的排序槽位
+    let runeOrder = [];   // 存储符文排序结果
+
+    // 方向选择
+    function selectDir(dir) {
+      // 移除所有方向按钮的选中状态
+      document.querySelectorAll('.dir-btn').forEach(btn => btn.classList.remove('on'));
+      // 标记当前选中的方向
+      event.target.classList.add('on');
+      selectedDir = dir;
+    }
+
+    // 符文槽位选择
+    function selectSlot(slotNum) {
+      document.querySelectorAll('.o-slot').forEach(slot => slot.classList.remove('on'));
+      document.getElementById(`slot${slotNum}`).classList.add('on');
+      selectedSlot = slotNum;
+    }
+
+    // 符文拾取
+    function pickRune(rune) {
+      if (selectedSlot === 0) return; // 未选槽位则不操作
+      const slotEl = document.getElementById(`slot${selectedSlot}`);
+      slotEl.textContent = rune;
+      runeOrder[selectedSlot - 1] = rune; // 存入排序数组（索引从0开始）
+      document.getElementById(`rune${['🔥','🌿','✨'].indexOf(rune)+1}`).classList.add('used');
+      selectedSlot = 0; // 重置选中槽位
+    }
+
+    // 答案确认（核心验证逻辑）
+    function confirm_answer() {
+      const c = CONTENT[S.role][S.stage];
+      let isCorrect = false;
+
+      // 验证阶段1：方向谜题
+      if (S.stage === 1) {
+        isCorrect = selectedDir === c.correct;
+      }
+
+      // 验证阶段2：文本输入（A）/ 符文排序（B）
+      if (S.stage === 2) {
+        if (S.role === 'A') {
+          const inputVal = document.getElementById('text-ans').value.trim().toLowerCase();
+          isCorrect = inputVal === c.correct;
+        } else {
+          isCorrect = JSON.stringify(runeOrder) === JSON.stringify(c.correct);
+        }
+      }
+
+      // 验证结果处理
+      if (isCorrect) {
+        S.solved = true;
+        fairyHappy(); // 精灵开心动画（需补充）
+        showWaitScreen(); // 显示等待屏幕
+      } else {
+        penalty(); // 惩罚机制（扣星/倒计时）
+        fairySad(); // 精灵难过动画（需补充）
+        // 错误反馈（方向按钮抖动）
+        if (S.stage === 1) {
+          event.target.closest('.dir-btn')?.classList.add('bad');
+          setTimeout(() => event.target.closest('.dir-btn')?.classList.remove('bad'), 400);
+        }
+      }
+    }
+
+    // 关闭等待屏幕
+    function dismissWait() {
+      document.getElementById('wait-screen').classList.add('hidden');
+      S.stage += 1; // 进入下一阶段
+      S.solved = false;
+      if (S.stage > 2) {
+        showResult(); // 显示最终结果
+      } else {
+        showHint(); // 显示扫描提示
+      }
+    }
+
+    // 重置游戏
+    function resetGame() {
+      S.role = '';
+      S.stage = 1;
+      S.stars = 3;
+      S.penaltyActive = false;
+      document.getElementById('result-screen').classList.add('hidden');
+      document.getElementById('role-screen').classList.remove('hidden');
+      // 重置星星显示
+      document.querySelectorAll('.hud-star').forEach(star => star.classList.remove('lost'));
+    }
+
+    // 辅助函数（简化示例，可按需扩展）
+    function pickRole(role) {
+      S.role = role;
+      document.getElementById('role-screen').classList.add('hidden');
+      document.getElementById('hud').classList.remove('hidden');
+      document.getElementById('fairy').classList.remove('hidden');
+      document.getElementById('hud-badge').className = `hud-badge ${role.toLowerCase()}`;
+      document.getElementById('hud-badge').textContent = `Player ${role}`;
+      document.getElementById('p-rtag').className = `p-rtag ${role.toLowerCase()}`;
+      document.getElementById('p-rtag').textContent = `Player ${role}`;
+      startAR(); // 启动AR（需补充）
+      showHint();
+    }
+
+    function showHint() {
+      document.getElementById('hint').classList.remove('hidden');
+    }
+
+    function hideHint() {
+      document.getElementById('hint').classList.add('hidden');
+    }
+
+    function showWaitScreen() {
+      const wtText = S.role === 'A' ? 
+        'Wait for Player B to finish their stage...' : 
+        'Wait for Player A to finish their stage...';
+      document.getElementById('wt-text').textContent = wtText;
+      document.getElementById('wait-screen').classList.remove('hidden');
+    }
+
+    function showResult() {
+      document.getElementById('ar-scene').style.display = 'none';
+      document.getElementById('hud').classList.add('hidden');
+      document.getElementById('fairy').classList.add('hidden');
+      document.getElementById('result-screen').classList.remove('hidden');
+      // 根据剩余星星显示不同结果文本
+      const resText = S.stars === 3 ? 
+        'You restored the village with all magic intact! ✨' : 
+        `You restored the village with ${S.stars} stars left — well done!`;
+      document.getElementById('res-text').textContent = resText;
+    }
+
+    function penalty() {
+      if (S.penaltyActive || S.stars <= 0) return;
+      S.penaltyActive = true;
+      S.stars -= 1;
+      document.getElementById(`hs${3 - S.stars}`).classList.add('lost');
+      // 显示惩罚弹窗 + 倒计时
+      document.getElementById('pen').classList.add('show');
+      let timer = 30;
+      const timerEl = document.getElementById('pen-timer');
+      const penInterval = setInterval(() => {
+        timer -= 1;
+        timerEl.textContent = timer;
+        if (timer <= 0) {
+          clearInterval(penInterval);
+          document.getElementById('pen').classList.remove('show');
+          S.penaltyActive = false;
+        }
+      }, 1000);
+    }
+
+    function fairyHappy() {
+      document.getElementById('fairy').classList.add('fairy-happy');
+      setTimeout(() => document.getElementById('fairy').classList.remove('fairy-happy'), 1000);
+    }
+
+    function fairySad() {
+      document.getElementById('fairy').classList.add('fairy-sad');
+      setTimeout(() => document.getElementById('fairy').classList.remove('fairy-sad'), 1200);
+    }
+
+    function startAR() {
+      const scene = document.getElementById('ar-scene');
+      scene.style.display = 'block';
+      const mindar = scene.components['mindar-image'];
+      mindar.start();
+      // AR 识别到目标时触发弹窗
+      scene.querySelectorAll('[mindar-image-target]').forEach((target, idx) => {
+        target.addEventListener('targetFound', () => {
+          if (!S.solved) showPopup();
+        });
+      });
+    }
+
+    function fairyTap() {
+      // 精灵点击气泡提示（简化示例）
+      const bubble = document.getElementById('bubble');
+      const tips = [
+        "Scan your marker to start! ✨",
+        "If you get stuck, check the clue carefully...",
+        "Work with your partner to finish all stages!"
+      ];
+      bubble.textContent = tips[Math.floor(Math.random() * tips.length)];
+      bubble.classList.add('show');
+      setTimeout(() => bubble.classList.remove('show'), 3000);
+    }
+  </script>
+
+  <!-- 闭合 body 和 html -->
+</body>
+</html>
+  
 </body>
 </html>
