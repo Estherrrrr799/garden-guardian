@@ -112,6 +112,16 @@ body{font-family:'Crimson Text',Georgia,serif;background:#0a1a0a;overflow:hidden
 .rune-choice:active{transform:scale(.94)}
 .rune-choice.used{opacity:.14;pointer-events:none}
 
+/* CLUE BOXES */
+.clue-box{border-radius:10px;padding:12px;margin-bottom:12px}
+.clue-a{background:rgba(200,151,58,.07);border:1px solid rgba(200,151,58,.22)}
+.clue-b{background:rgba(159,207,160,.06);border:1px solid rgba(159,207,160,.18)}
+.clue-label{font-family:'Cinzel',serif;font-size:9px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:8px;text-align:center}
+.clue-a .clue-label{color:#c8973a}
+.clue-b .clue-label{color:#9fcfa0}
+.clue-svg{width:100%;max-height:180px;display:block;margin:0 auto 8px}
+.clue-hint{font-size:11px;color:#888;line-height:1.6;font-style:italic;text-align:center;border-top:1px solid rgba(255,255,255,.06);padding-top:8px;margin-top:4px}
+
 /* PENALTY */
 #penalty-overlay{position:fixed;inset:0;z-index:200;background:rgba(130,20,20,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;opacity:0;pointer-events:none;transition:opacity .3s}
 #penalty-overlay.show{opacity:1;pointer-events:all}
@@ -516,10 +526,157 @@ function buildPuzzle(c){
   btn.className='btn-confirm disabled';
 
   if(c.puzzle==='direction'){
+    // Show different visual clues depending on role
+    let clueHtml = '';
+    if(S.stage===1 && S.role==='A'){
+      // Player A sees the magic symbol — must describe it to B
+      clueHtml = `
+        <div class="clue-box clue-a">
+          <div class="clue-label">Your AR symbol — describe this to Player B</div>
+          <svg viewBox="0 0 160 120" class="clue-svg">
+            <polygon points="80,15 140,105 20,105" fill="none" stroke="#c8973a" stroke-width="3"/>
+            <polygon points="80,40 120,90 40,90" fill="none" stroke="#c8973a" stroke-width="2" opacity=".5"/>
+            <circle cx="80" cy="68" r="8" fill="#c8973a" opacity=".7"/>
+            <line x1="80" y1="15" x2="80" y2="105" stroke="#9fcfa0" stroke-width="1.5" stroke-dasharray="4,3"/>
+            <text y="116" x="80" text-anchor="middle" fill="#c8973a" font-size="10" font-family="serif">Point to North-East</text>
+          </svg>
+          <div class="clue-hint">The triangle points toward the shadow direction. Tell B: "triangle pointing upper-right"</div>
+        </div>`;
+    } else if(S.stage===1 && S.role==='B'){
+      // Player B sees compass — must listen to A's symbol and pick direction
+      clueHtml = `
+        <div class="clue-box clue-b">
+          <div class="clue-label">Your compass — listen to Player A's symbol, then pick the direction it points</div>
+          <svg viewBox="0 0 160 160" class="clue-svg">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#9fcfa0" stroke-width="1.5" opacity=".4"/>
+            <circle cx="80" cy="80" r="5" fill="#c8973a"/>
+            <line x1="80" y1="80" x2="80" y2="18" stroke="#f0e8d0" stroke-width="2" stroke-linecap="round"/>
+            <polygon points="80,14 75,26 85,26" fill="#f0e8d0"/>
+            <text x="80" y="11" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">N</text>
+            <text x="80" y="156" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">S</text>
+            <text x="8" y="84" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">W</text>
+            <text x="152" y="84" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">E</text>
+            <text x="130" y="32" text-anchor="middle" fill="#c8973a" font-size="10" font-family="serif">NE</text>
+            <text x="130" y="138" text-anchor="middle" fill="#666" font-size="10" font-family="serif">SE</text>
+            <text x="30" y="32" text-anchor="middle" fill="#666" font-size="10" font-family="serif">NW</text>
+            <text x="30" y="138" text-anchor="middle" fill="#c8973a" font-size="10" font-family="serif">SW</text>
+          </svg>
+          <div class="clue-hint">Ask Player A: "Which way does the symbol point?" Then select below.</div>
+        </div>`;
+    } else if(S.stage===2 && S.role==='A'){
+      // Stage 2 Player A — listens to B, picks direction
+      clueHtml = `
+        <div class="clue-box clue-b">
+          <div class="clue-label">Your compass — Player B will tell you the storm direction</div>
+          <svg viewBox="0 0 160 160" class="clue-svg">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#9fcfa0" stroke-width="1.5" opacity=".4"/>
+            <circle cx="80" cy="80" r="5" fill="#c8973a"/>
+            <line x1="80" y1="80" x2="80" y2="18" stroke="#f0e8d0" stroke-width="2" stroke-linecap="round"/>
+            <polygon points="80,14 75,26 85,26" fill="#f0e8d0"/>
+            <text x="80" y="11" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">N</text>
+            <text x="80" y="156" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">S</text>
+            <text x="8" y="84" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">W</text>
+            <text x="152" y="84" text-anchor="middle" fill="#9fcfa0" font-size="11" font-family="serif">E</text>
+            <text x="130" y="32" text-anchor="middle" fill="#666" font-size="10" font-family="serif">NE</text>
+            <text x="130" y="138" text-anchor="middle" fill="#666" font-size="10" font-family="serif">SE</text>
+            <text x="30" y="32" text-anchor="middle" fill="#666" font-size="10" font-family="serif">NW</text>
+            <text x="30" y="138" text-anchor="middle" fill="#c8973a" font-size="10" font-family="serif">SW</text>
+          </svg>
+          <div class="clue-hint">Listen to Player B, then select the direction they describe.</div>
+        </div>`;
+    } else if(S.stage===2 && S.role==='B'){
+      // Stage 2 Player B — sees wind direction, tells A
+      clueHtml = `
+        <div class="clue-box clue-a">
+          <div class="clue-label">The stump reveals the storm direction — tell this to Player A</div>
+          <svg viewBox="0 0 160 130" class="clue-svg">
+            <path d="M140,30 Q90,20 60,55 Q30,90 20,110" fill="none" stroke="#c8783c" stroke-width="3" stroke-linecap="round"/>
+            <polygon points="20,110 28,94 36,108" fill="#c8783c"/>
+            <path d="M130,50 Q85,38 58,68 Q35,95 28,112" fill="none" stroke="#c8783c" stroke-width="1.5" opacity=".5" stroke-linecap="round"/>
+            <path d="M150,18 Q100,8 65,42" fill="none" stroke="#c8783c" stroke-width="1.5" opacity=".4" stroke-linecap="round"/>
+            <text x="80" y="123" text-anchor="middle" fill="#e8a060" font-size="10" font-family="serif">Storm came from North-East → blew South-West</text>
+          </svg>
+          <div class="clue-hint">Tell Player A: "The storm came from the North-East, blowing South-West"</div>
+        </div>`;
+    }
     const dirs=['North ↑','South ↓','North-East ↗','South-West ↙'];
-    pz.innerHTML=`<div class="pz-area"><div class="pz-label">Select the correct direction</div><div class="dir-grid">${dirs.map(d=>`<button class="dir-btn" onclick="selDir(this,'${d}')">${d}</button>`).join('')}</div></div>`;
+    pz.innerHTML=clueHtml+`<div class="pz-area"><div class="pz-label">Select the direction</div><div class="dir-grid">${dirs.map(d=>`<button class="dir-btn" onclick="selDir(this,'${d}')">${d}</button>`).join('')}</div></div>`;
   } else if(c.puzzle==='text'){
-    pz.innerHTML=`<div class="pz-area"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Orion" oninput="chkTxt()"></div>`;
+    let starHtml = '';
+    if(S.role==='A'){
+      // Player A sees left half of Orion (Betelgeuse + shoulder area)
+      starHtml = `
+        <div class="clue-box clue-a">
+          <div class="clue-label">Your half of the constellation — describe to Player B</div>
+          <svg viewBox="0 0 160 180" class="clue-svg">
+            <rect x="0" y="0" width="160" height="180" fill="transparent"/>
+            <line x1="80" y1="0" x2="80" y2="180" stroke="#c8973a" stroke-width="1" stroke-dasharray="5,5" opacity=".35"/>
+            <text x="35" y="14" fill="#888" font-size="9" font-family="serif">YOUR HALF</text>
+            <text x="95" y="14" fill="#555" font-size="9" font-family="serif">PLAYER B</text>
+            <!-- LEFT half stars (Betelgeuse top-left, Bellatrix top-right-of-left, left belt star) -->
+            <circle cx="28" cy="40" r="7" fill="#f0e8d0" opacity=".9"/>
+            <circle cx="28" cy="40" r="4" fill="white"/>
+            <text x="28" y="30" text-anchor="middle" fill="#c8973a" font-size="8" font-family="serif">Betelgeuse</text>
+            <circle cx="62" cy="55" r="5" fill="#f0e8d0" opacity=".8"/>
+            <circle cx="62" cy="55" r="3" fill="white"/>
+            <text x="62" y="45" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Bellatrix</text>
+            <circle cx="45" cy="108" r="6" fill="#f0e8d0" opacity=".85"/>
+            <circle cx="45" cy="108" r="3.5" fill="white"/>
+            <text x="30" y="122" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Belt L</text>
+            <circle cx="30" cy="155" r="5" fill="#f0e8d0" opacity=".75"/>
+            <circle cx="30" cy="155" r="3" fill="white"/>
+            <text x="30" y="168" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Saiph</text>
+            <!-- connecting lines left side -->
+            <line x1="28" y1="47" x2="62" y2="55" stroke="#f0e8d0" stroke-width="1" opacity=".45"/>
+            <line x1="62" y1="60" x2="45" y2="101" stroke="#f0e8d0" stroke-width="1" opacity=".45"/>
+            <line x1="45" y1="114" x2="30" y2="149" stroke="#f0e8d0" stroke-width="1" opacity=".45"/>
+            <!-- faded right side hint -->
+            <circle cx="100" cy="40" r="5" fill="#444" opacity=".4"/>
+            <circle cx="68" cy="108" r="5" fill="#444" opacity=".3"/>
+            <circle cx="82" cy="108" r="5" fill="#444" opacity=".3"/>
+            <circle cx="70" cy="155" r="4" fill="#444" opacity=".3"/>
+          </svg>
+          <div class="clue-hint">Describe to B: "I see a bright star top-left (Betelgeuse), one middle-left, and two stars forming the left edge going down."</div>
+        </div>`;
+    } else {
+      // Player B sees right half of Orion (Rigel + right belt + right shoulder)
+      starHtml = `
+        <div class="clue-box clue-b">
+          <div class="clue-label">Your half of the constellation — describe to Player A</div>
+          <svg viewBox="0 0 160 180" class="clue-svg">
+            <rect x="0" y="0" width="160" height="180" fill="transparent"/>
+            <line x1="80" y1="0" x2="80" y2="180" stroke="#c8973a" stroke-width="1" stroke-dasharray="5,5" opacity=".35"/>
+            <text x="22" y="14" fill="#555" font-size="9" font-family="serif">PLAYER A</text>
+            <text x="95" y="14" fill="#888" font-size="9" font-family="serif">YOUR HALF</text>
+            <!-- RIGHT half stars (Rigel bottom-right, Bellatrix-mirror, right belt stars) -->
+            <circle cx="132" cy="40" r="5" fill="#f0e8d0" opacity=".8"/>
+            <circle cx="132" cy="40" r="3" fill="white"/>
+            <text x="132" y="30" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Meissa</text>
+            <circle cx="98" cy="55" r="5" fill="#f0e8d0" opacity=".8"/>
+            <circle cx="98" cy="55" r="3" fill="white"/>
+            <circle cx="68" cy="108" r="5" fill="#f0e8d0" opacity=".8"/>
+            <circle cx="68" cy="108" r="3" fill="white"/>
+            <text x="68" y="98" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Belt C</text>
+            <circle cx="82" cy="108" r="5" fill="#f0e8d0" opacity=".8"/>
+            <circle cx="82" cy="108" r="3" fill="white"/>
+            <text x="88" y="122" text-anchor="middle" fill="#9fcfa0" font-size="8" font-family="serif">Belt R</text>
+            <circle cx="130" cy="155" r="7" fill="#f0e8d0" opacity=".9"/>
+            <circle cx="130" cy="155" r="4" fill="white"/>
+            <text x="130" y="168" text-anchor="middle" fill="#c8973a" font-size="8" font-family="serif">Rigel</text>
+            <!-- connecting lines right side -->
+            <line x1="98" y1="60" x2="82" y2="101" stroke="#f0e8d0" stroke-width="1" opacity=".45"/>
+            <line x1="82" y1="114" x2="130" y2="149" stroke="#f0e8d0" stroke-width="1" opacity=".45"/>
+            <line x1="68" y1="108" x2="82" y2="108" stroke="#f0e8d0" stroke-width="1.5" opacity=".6"/>
+            <!-- faded left side hint -->
+            <circle cx="28" cy="40" r="6" fill="#444" opacity=".4"/>
+            <circle cx="62" cy="55" r="4" fill="#444" opacity=".3"/>
+            <circle cx="45" cy="108" r="4" fill="#444" opacity=".3"/>
+            <circle cx="30" cy="155" r="4" fill="#444" opacity=".3"/>
+          </svg>
+          <div class="clue-hint">Describe to A: "I see a very bright star bottom-right (Rigel), two belt stars on the right, and stars going up the right side."</div>
+        </div>`;
+    }
+    pz.innerHTML=starHtml+`<div class="pz-area"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Orion" oninput="chkTxt()"></div>`;
   } else if(c.puzzle==='order'){
     S.finaleSlots=[null,null,null];
     buildOrder();
