@@ -317,31 +317,63 @@ body{font-family:'Crimson Text',Georgia,serif;background:#0a1a0a;overflow:hidden
 
 <script>
 // ══════════════════════════════════════════
-// AUDIO ENGINE  (iOS-safe)
+// AUDIO ENGINE  (iOS Safari — fresh context per gesture)
 // ══════════════════════════════════════════
-let AC = null;
 
-// Must be called synchronously inside a user-gesture handler on iOS
-function bootAudio() {
+// On iOS, AudioContext must be created AND used in the same synchronous
+// user-gesture stack. We create a fresh unlocked context each time we
+// want to play a sound, schedule the notes, then let it close itself.
+function playNote(freq, type, dur, vol, delay) {
   try {
-    if (!AC) {
-      AC = new (window.AudioContext || window.webkitAudioContext)();
-    }
-    if (AC.state === 'suspended') {
-      AC.resume();
-    }
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    const t = ctx.currentTime + (delay || 0);
+    vol = vol || 0.22;
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.06);
+    // close context shortly after last note ends
+    setTimeout(() => { try { ctx.close(); } catch(e){} }, (t - ctx.currentTime + dur + 0.2) * 1000);
   } catch(e) {}
 }
 
-// Keep backward-compat alias
-function resumeAC() { bootAudio(); }
+// Shared context for multi-note SFX (created once per gesture call)
+let _sfxCtx = null;
+function _ctx() {
+  if (!_sfxCtx || _sfxCtx.state === 'closed') {
+    _sfxCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return _sfxCtx;
+}
+function _note(ctx, freq, type, dur, vol, delay) {
+  try {
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    const t = ctx.currentTime + (delay || 0);
+    vol = vol || 0.22;
+    o.type = type || 'sine';
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.025);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t + dur + 0.06);
+  } catch(e) {}
+}
+
+function bootAudio() { /* no-op — context created per-gesture now */ }
+function resumeAC()  { /* no-op */ }
 
 function note(freq, type, dur, vol, delay) {
-  delay = delay || 0; vol = vol || 0.22;
-  try {
-    bootAudio();
-    const ac = AC;
-    if (!ac) return;
+  // legacy shim — use playNote for single notes
+  playNote(freq, type, dur, vol, delay);
+  return; {  // dead block kept for structure
+  const ac = null;
     const o = ac.createOscillator();
     const g = ac.createGain();
     const t = ac.currentTime + delay;
@@ -356,63 +388,78 @@ function note(freq, type, dur, vol, delay) {
 }
 
 const SFX = {
-  // Role select — soft magic chime
   select() {
-    note(880, 'sine', .12, .2);
-    note(1108, 'sine', .15, .22, .1);
-    note(1320, 'sine', .2, .18, .2);
+    const c = _ctx();
+    _note(c,880,'sine',.14,.2,0);
+    _note(c,1108,'sine',.16,.22,.11);
+    _note(c,1320,'sine',.22,.18,.22);
+    setTimeout(()=>{try{c.close();}catch(e){}},600);
   },
   // Scan — discovery ding
   scan() {
-    note(523, 'sine', .08, .18);
-    note(784, 'sine', .1, .22, .08);
-    note(1047, 'sine', .18, .28, .16);
+    const c=_ctx();
+    _note(c,523,'sine',.1,.18,0);
+    _note(c,784,'sine',.12,.22,.09);
+    _note(c,1047,'sine',.2,.28,.18);
+    setTimeout(()=>{try{c.close();}catch(e){}},500);
   },
   // Direction select click
-  click() {
-    note(660, 'sine', .07, .14);
-  },
+  click() { playNote(660,'sine',.08,.14,0); },
   // Correct answer — ascending triumph
   correct() {
-    [523, 659, 784, 1047].forEach((f, i) => note(f, 'sine', .25, .28, i * .09));
-    note(1568, 'sine', .4, .32, .4);
+    const c=_ctx();
+    [523,659,784,1047].forEach((f,i)=>_note(c,f,'sine',.25,.28,i*.1));
+    _note(c,1568,'sine',.45,.3,.45);
+    setTimeout(()=>{try{c.close();}catch(e){}},900);
   },
   // Wrong answer — low thud
   wrong() {
-    note(200, 'sawtooth', .08, .3);
-    note(160, 'sawtooth', .15, .28, .09);
-    note(120, 'sawtooth', .2, .22, .2);
+    const c=_ctx();
+    _note(c,200,'sawtooth',.1,.3,0);
+    _note(c,160,'sawtooth',.16,.28,.1);
+    _note(c,120,'sawtooth',.22,.22,.22);
+    setTimeout(()=>{try{c.close();}catch(e){}},600);
   },
   // Stage clear — fanfare
   stage() {
-    note(784, 'sine', .18, .28);
-    note(1047, 'sine', .22, .32, .15);
-    note(1319, 'sine', .28, .3, .3);
-    note(1568, 'sine', .35, .28, .46);
+    const c=_ctx();
+    _note(c,784,'sine',.2,.28,0);
+    _note(c,1047,'sine',.24,.32,.16);
+    _note(c,1319,'sine',.3,.3,.32);
+    _note(c,1568,'sine',.38,.28,.5);
+    setTimeout(()=>{try{c.close();}catch(e){}},1000);
   },
   // Star lost — sad descend
   star() {
-    note(440, 'triangle', .15, .28);
-    note(349, 'triangle', .18, .25, .15);
-    note(262, 'triangle', .25, .22, .3);
+    const c=_ctx();
+    _note(c,440,'triangle',.16,.28,0);
+    _note(c,349,'triangle',.2,.25,.16);
+    _note(c,262,'triangle',.28,.22,.32);
+    setTimeout(()=>{try{c.close();}catch(e){}},800);
   },
   // Victory — full melody
   victory() {
-    const mel = [523, 659, 784, 1047, 1319, 1568, 2093];
-    mel.forEach((f, i) => note(f, 'sine', .35, .3, i * .12));
-    mel.slice().reverse().forEach((f, i) => note(f, 'sine', .28, .25, mel.length * .12 + .2 + i * .1));
+    const c=_ctx();
+    const mel=[523,659,784,1047,1319,1568,2093];
+    mel.forEach((f,i)=>_note(c,f,'sine',.38,.3,i*.13));
+    mel.slice().reverse().forEach((f,i)=>_note(c,f,'sine',.3,.25,mel.length*.13+.25+i*.1));
+    setTimeout(()=>{try{c.close();}catch(e){}},3500);
   },
   // Fairy appear
   appear() {
-    note(1047, 'sine', .1, .18);
-    note(1319, 'sine', .12, .2, .1);
-    note(1568, 'sine', .08, .15, .2);
+    const c=_ctx();
+    _note(c,1047,'sine',.12,.18,0);
+    _note(c,1319,'sine',.14,.2,.11);
+    _note(c,1568,'sine',.1,.15,.22);
+    setTimeout(()=>{try{c.close();}catch(e){}},500);
   },
   // Penalty alarm
   penalty() {
-    note(180, 'sawtooth', .5, .4);
-    note(160, 'sawtooth', .5, .35, .15);
-    note(140, 'sawtooth', .6, .3, .3);
+    const c=_ctx();
+    _note(c,180,'sawtooth',.55,.4,0);
+    _note(c,160,'sawtooth',.55,.35,.16);
+    _note(c,140,'sawtooth',.65,.3,.32);
+    setTimeout(()=>{try{c.close();}catch(e){}},1200);
   }
 };
 
@@ -487,9 +534,9 @@ const CONTENT = {
       story: "You found the left bench! Behind the backrest, a half-constellation is hidden. Describe what you see to Player B — together you will name it.",
       clueLabel: 'Your half of the constellation',
       clueClass: 'ca',
-      clue: `You see the LEFT half of a constellation:\n· A very bright star top-left\n· A slightly smaller star to its right\n· One belt star in the middle-left area\n· A foot star at the bottom-left\n\nDescribe these star positions to Player B.\nDo NOT show your screen.`,
+      clue: `You see the LEFT half of a constellation:\n\n· One very bright star — top-left corner\n· One slightly smaller star — just to its right\n· One star in the middle-left (part of a horizontal row)\n· One star at the bottom-left\n\nDescribe ONLY positions — e.g. "bright star top-left, another star right of it, one in the middle-left row, one bottom-left."\nDo NOT say the constellation name.`,
       taskLabel: 'Player A · Your Task',
-      task: 'Describe your stars to Player B.\nListen to Player B\'s stars.\nTogether, identify the full constellation and type its name.',
+      task: 'Describe your star positions to Player B (no names!).\nListen to Player B describe their half.\nLook at the printed reference card.\nTogether, identify the full constellation and type its name below.',
       puzzle: 'text',
       correct: 'orion',
       successMsg: 'Orion! You identified the constellation!\nNow both guardians walk to the CENTRE of the lawn.',
@@ -521,9 +568,9 @@ const CONTENT = {
       story: "You found the right bench! Behind the backrest, a half-constellation is hidden. Describe what you see to Player A — together you will name it.",
       clueLabel: 'Your half of the constellation',
       clueClass: 'cb',
-      clue: `You see the RIGHT half of a constellation:\n· A very bright star bottom-right\n· Two stars in a row in the middle-right (belt stars)\n· A star going up the right side\n· Stars toward the top-right\n\nDescribe these star positions to Player A.\nDo NOT show your screen.`,
+      clue: `You see the RIGHT half of a constellation:\n\n· Two stars side by side in the middle (part of a horizontal row)\n· One very bright star — bottom-right corner\n· One star going up the right side\n· One smaller star — top-right area\n\nDescribe ONLY positions — e.g. "two stars in the middle row, bright star bottom-right, one going up the right, one top-right."\nDo NOT say the constellation name.`,
       taskLabel: 'Player B · Your Task',
-      task: 'Describe your stars to Player A.\nListen to Player A\'s stars.\nTogether, identify the full constellation and type its name.',
+      task: 'Describe your star positions to Player A (no names!).\nListen to Player A describe their half.\nLook at the printed reference card.\nTogether, identify the full constellation and type its name below.',
       puzzle: 'text',
       correct: 'orion',
       successMsg: 'Orion! You identified the constellation!\nNow both guardians walk to the CENTRE of the lawn.',
@@ -538,11 +585,11 @@ const CONTENT = {
     story: "All three fragments gathered! Both guardians stand at the centre of the lawn. Recall the runes you each found across both stages and arrange them in the correct order.",
     clueLabel: 'The three runes you collected',
     clueClass: 'ca',
-    clue: `Stage 1 rune: 🌿 (found at the trees)\nStage 2 rune: 🍄 (found at the benches)\nThe fairy's gift: 🔮 (given for completing both stages)\n\nArrange them in the order you collected them:\nfirst thing found → middle → last.`,
+    clue: `The fairy left three runes scattered across the garden.\n\nThink back:\n· Which rune did you encounter first?\n· Which came second?\n· Which was last?\n\nTalk to each other — Player A and Player B may have found different runes at different times. Together you can work out the correct order.`,
     taskLabel: 'Both Players · Final Task',
-    task: 'Walk together to the centre of the lawn.\nArrange the three runes in the correct order.\nBoth players confirm on their own phones.',
+    task: 'Walk to the centre of the lawn together.\nDiscuss with each other: when did you each first see a rune?\nArrange the three runes from first to last.\nBoth players confirm on their own phones.',
     puzzle: 'order',
-    correctOrder: ['🌿', '🍄', '🔮'],
+    correctOrder: ['🌿', '🔮', '🍄'],
     successMsg: '',
     hud: 'Final Stage · Lawn Centre',
     hint: 'Walk to the centre of the lawn ✦'
