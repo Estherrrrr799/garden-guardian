@@ -1,612 +1,669 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Garden Guardian · AR Game</title>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image.prod.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Garden Guardian · AR</title>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.2/dist/mindar-image-aframe.prod.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;1,400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Crimson Text',Georgia,serif;background:#0a1a0a;overflow:hidden;height:100vh}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;padding:24px}
+.screen.hidden{display:none}
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Crimson Text', Georgia, serif; background: #0a1a0a; overflow: hidden; }
+/* ROLE SELECT */
+#role-screen{background:radial-gradient(ellipse at 30% 20%,#1a3a1a 0%,#0a1a0a 70%);text-align:center}
+.r-fairy{font-size:58px;margin-bottom:12px;display:inline-block;animation:ffloat 3s ease-in-out infinite}
+.r-title{font-family:'Cinzel',serif;font-size:24px;color:#f0e8d0;margin-bottom:4px}
+.r-sub{font-family:'Cinzel',serif;font-size:11px;color:#c8973a;letter-spacing:.2em;margin-bottom:16px}
+.r-story{font-size:13px;color:#a8c8a0;line-height:1.8;margin-bottom:22px;max-width:280px;font-style:italic}
+.r-cards{display:flex;gap:12px;margin-bottom:16px}
+.r-card{flex:1;border-radius:14px;padding:16px 10px;cursor:pointer;transition:all .2s;text-align:center}
+.r-card:active{transform:scale(.97)}
+.r-card.a{background:rgba(100,160,220,.1);border:1.5px solid rgba(100,160,220,.45)}
+.r-card.b{background:rgba(180,100,220,.1);border:1.5px solid rgba(180,100,220,.45)}
+.r-card-icon{font-size:28px;margin-bottom:6px}
+.r-card-name{font-family:'Cinzel',serif;font-size:13px;margin-bottom:3px}
+.r-card.a .r-card-name{color:#90c0f0}
+.r-card.b .r-card-name{color:#d090f0}
+.r-card-desc{font-size:10px;color:#666;line-height:1.5}
+.r-note{font-size:10px;color:#555;font-style:italic}
 
-    .screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; transition: opacity 0.6s ease; }
-    .screen.hidden { opacity: 0; pointer-events: none; }
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;z-index:50;padding:10px 14px 6px;background:linear-gradient(180deg,rgba(0,0,0,.78) 0%,transparent 100%);display:flex;align-items:flex-start;justify-content:space-between;pointer-events:none}
+#hud.hidden{display:none}
+.hud-l{display:flex;flex-direction:column;gap:2px}
+.hud-game{font-family:'Cinzel',serif;font-size:9px;color:#c8973a;letter-spacing:.15em}
+.hud-stage{font-family:'Cinzel',serif;font-size:9px;color:#9fcfa0;margin-top:1px}
+.hud-badge{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.1em;padding:2px 7px;border-radius:7px;margin-top:3px;align-self:flex-start}
+.hud-badge.a{background:rgba(100,160,220,.22);color:#90c0f0;border:1px solid rgba(100,160,220,.38)}
+.hud-badge.b{background:rgba(180,100,220,.22);color:#d090f0;border:1px solid rgba(180,100,220,.38)}
+.hud-stars{display:flex;gap:3px}
+.hud-star{font-size:16px;transition:all .35s}
+.hud-star.lost{filter:grayscale(1);opacity:.18}
 
-    #intro-screen {
-      background: radial-gradient(ellipse at 30% 20%, #1a3a1a 0%, #0a1a0a 70%);
-      padding: 32px 24px; text-align: center;
-    }
-    .intro-fairy { font-size: 72px; margin-bottom: 16px; animation: float 3s ease-in-out infinite; }
-    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
-    .intro-title { font-family: 'Cinzel', serif; font-size: 30px; color: #f0e8d0; margin-bottom: 6px; }
-    .intro-sub { font-family: 'Cinzel', serif; font-size: 13px; color: #c8973a; margin-bottom: 20px; letter-spacing: 0.25em; }
-    .intro-story { font-size: 15px; color: #a8c8a0; line-height: 1.8; margin-bottom: 28px; max-width: 320px; font-style: italic; }
-    .stars-display { display: flex; gap: 8px; justify-content: center; margin-bottom: 28px; }
-    .star-icon { font-size: 28px; transition: all 0.3s; }
-    .star-icon.lost { filter: grayscale(1); opacity: 0.3; }
-    .btn-start {
-      background: linear-gradient(135deg, #2c5f2d, #1a3a1a);
-      border: 1.5px solid #c8973a; color: #f0e8d0;
-      font-family: 'Cinzel', serif; font-size: 16px;
-      padding: 14px 40px; border-radius: 30px; cursor: pointer; letter-spacing: 0.1em;
-    }
-    .btn-start:active { transform: scale(0.97); }
+/* FAIRY SPRITE */
+#fairy{position:fixed;bottom:210px;right:14px;z-index:55;width:58px;height:58px;cursor:pointer;transition:all .3s}
+#fairy.hidden{display:none}
+#fairy svg{animation:ffloat 2.8s ease-in-out infinite}
+.fairy-happy{animation:fhappy .5s ease-in-out 3 !important}
+.fairy-sad{animation:fsad .4s ease-in-out 3 !important}
+@keyframes ffloat{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-9px) rotate(4deg)}}
+@keyframes fhappy{0%{transform:scale(1) rotate(0)}30%{transform:scale(1.4) rotate(-18deg)}70%{transform:scale(1.4) rotate(18deg)}100%{transform:scale(1) rotate(0)}}
+@keyframes fsad{0%{transform:translateY(0)}40%{transform:translateY(7px)}100%{transform:translateY(0)}}
 
-    #hud {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-      padding: 16px 20px 12px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.7) 0%, transparent 100%);
-      display: flex; align-items: center; justify-content: space-between;
-      pointer-events: none;
-    }
-    #hud.hidden { display: none; }
-    .hud-title { font-family: 'Cinzel', serif; font-size: 13px; color: #c8973a; letter-spacing: 0.15em; }
-    .hud-stars { display: flex; gap: 4px; }
-    .hud-star { font-size: 20px; transition: all 0.3s; }
-    .hud-star.lost { filter: grayscale(1); opacity: 0.25; }
-    .hud-stage { font-size: 12px; color: #9fcfa0; font-family: 'Cinzel', serif; }
+/* FAIRY BUBBLE */
+#fairy-bubble{position:fixed;bottom:276px;right:10px;z-index:56;background:rgba(8,24,8,.96);border:1px solid rgba(200,151,58,.45);border-radius:12px 12px 4px 12px;padding:9px 12px;max-width:185px;font-size:11px;color:#c8e8c0;line-height:1.6;font-style:italic;pointer-events:none;opacity:0;transform:scale(.8) translateY(6px);transition:all .3s}
+#fairy-bubble.show{opacity:1;transform:scale(1) translateY(0)}
 
-    #popup {
-      position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
-      background: linear-gradient(180deg, rgba(10,26,10,0.95) 0%, rgba(10,26,10,1) 100%);
-      border-top: 1px solid rgba(200,151,58,0.4);
-      border-radius: 20px 20px 0 0;
-      padding: 24px 24px 40px;
-      transform: translateY(100%);
-      transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      max-height: 85vh; overflow-y: auto;
-    }
-    #popup.show { transform: translateY(0); }
-    .popup-handle { width: 40px; height: 4px; background: rgba(200,151,58,0.4); border-radius: 2px; margin: 0 auto 20px; }
-    .popup-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
-    .popup-stage { font-family: 'Cinzel', serif; font-size: 10px; color: #c8973a; letter-spacing: 0.2em; text-align: center; margin-bottom: 6px; }
-    .popup-title { font-family: 'Cinzel', serif; font-size: 20px; color: #f0e8d0; text-align: center; margin-bottom: 12px; }
-    .popup-text { font-size: 14px; color: #a8c8a0; line-height: 1.8; font-style: italic; margin-bottom: 20px; text-align: center; }
-    .popup-task { background: rgba(200,151,58,0.08); border: 1px solid rgba(200,151,58,0.2); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
-    .popup-task-label { font-family: 'Cinzel', serif; font-size: 9px; color: #c8973a; letter-spacing: 0.2em; margin-bottom: 8px; text-transform: uppercase; }
-    .popup-task-text { font-size: 14px; color: #d8e8d0; line-height: 1.7; }
+/* SCAN HINT */
+#scan-hint{position:fixed;bottom:80px;left:0;right:0;text-align:center;z-index:50;pointer-events:none}
+#scan-hint.hidden{display:none}
+.sh-inner{display:inline-block;background:rgba(0,0,0,.6);border:1px solid rgba(200,151,58,.3);border-radius:20px;padding:7px 16px;font-family:'Cinzel',serif;font-size:9px;color:#c8973a;letter-spacing:.1em;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 
-    .puzzle-area { margin-bottom: 16px; }
-    .puzzle-label { font-family: 'Cinzel', serif; font-size: 10px; color: #9fcfa0; letter-spacing: 0.15em; margin-bottom: 10px; text-align: center; text-transform: uppercase; }
-    .direction-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .dir-btn {
-      background: rgba(159,207,160,0.1); border: 1px solid rgba(159,207,160,0.25);
-      border-radius: 10px; padding: 14px 10px; color: #c8e8c0;
-      font-family: 'Cinzel', serif; font-size: 12px; cursor: pointer; text-align: center; transition: all 0.2s;
-    }
-    .dir-btn:active, .dir-btn.selected { background: rgba(159,207,160,0.25); border-color: #9fcfa0; color: #e8f8e8; }
-    .dir-btn.wrong { background: rgba(200,60,60,0.2); border-color: rgba(200,60,60,0.5); animation: shake 0.4s; }
-    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+/* POPUP */
+#popup{position:fixed;bottom:0;left:0;right:0;z-index:60;background:linear-gradient(180deg,rgba(6,18,6,.97) 0%,rgba(6,18,6,1) 100%);border-top:1px solid rgba(200,151,58,.28);border-radius:20px 20px 0 0;padding:16px 18px 32px;transform:translateY(100%);transition:transform .42s cubic-bezier(.34,1.56,.64,1);max-height:82vh;overflow-y:auto}
+#popup.show{transform:translateY(0)}
+.p-handle{width:32px;height:4px;background:rgba(200,151,58,.28);border-radius:2px;margin:0 auto 12px}
+.p-head{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.p-icon{font-size:28px}
+.p-meta{flex:1}
+.p-stage-label{font-family:'Cinzel',serif;font-size:8px;color:#c8973a;letter-spacing:.18em;margin-bottom:1px}
+.p-title{font-family:'Cinzel',serif;font-size:15px;color:#f0e8d0;line-height:1.2}
+.p-rtag{font-family:'Cinzel',serif;font-size:8px;letter-spacing:.08em;padding:2px 8px;border-radius:8px;white-space:nowrap}
+.p-rtag.a{background:rgba(100,160,220,.18);color:#90c0f0;border:1px solid rgba(100,160,220,.28)}
+.p-rtag.b{background:rgba(180,100,220,.18);color:#d090f0;border:1px solid rgba(180,100,220,.28)}
+.p-rtag.both{background:rgba(200,151,58,.15);color:#c8973a;border:1px solid rgba(200,151,58,.3)}
+.p-story{font-size:11px;color:#7aaa7a;line-height:1.72;font-style:italic;margin-bottom:10px;padding:9px 11px;background:rgba(255,255,255,.025);border-radius:8px;border-left:2px solid rgba(200,151,58,.25)}
+.p-task-box{background:rgba(200,151,58,.055);border:1px solid rgba(200,151,58,.14);border-radius:9px;padding:10px 12px;margin-bottom:11px}
+.p-task-label{font-family:'Cinzel',serif;font-size:8px;color:#c8973a;letter-spacing:.18em;margin-bottom:4px;text-transform:uppercase}
+.p-task-text{font-size:11px;color:#d0e8d0;line-height:1.72;white-space:pre-line}
+.btn-confirm{width:100%;background:linear-gradient(135deg,#2c5f2d,#1a3020);border:1.5px solid #c8973a;color:#f0e8d0;font-family:'Cinzel',serif;font-size:12px;padding:12px;border-radius:10px;cursor:pointer;letter-spacing:.08em;transition:all .2s}
+.btn-confirm:active{transform:scale(.98)}
+.btn-confirm.disabled{opacity:.28;pointer-events:none}
 
-    .answer-input {
-      width: 100%; background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(200,151,58,0.3); border-radius: 10px;
-      padding: 14px 16px; color: #f0e8d0;
-      font-family: 'Crimson Text', serif; font-size: 16px; outline: none; margin-bottom: 12px;
-    }
-    .answer-input::placeholder { color: rgba(200,151,58,0.4); }
-    .answer-input:focus { border-color: rgba(200,151,58,0.6); }
+/* WAIT SCREEN */
+#wait-screen{background:rgba(6,18,6,.97);text-align:center;padding:32px 22px}
+.wt-fairy{font-size:50px;margin-bottom:12px;animation:ffloat 2s ease-in-out infinite}
+.wt-title{font-family:'Cinzel',serif;font-size:17px;color:#f0e8d0;margin-bottom:7px}
+.wt-text{font-size:12px;color:#9fcfa0;line-height:1.75;max-width:260px;font-style:italic;white-space:pre-line;margin-bottom:16px}
+.wt-btn{background:rgba(200,151,58,.15);border:1px solid rgba(200,151,58,.38);color:#e8d090;font-family:'Cinzel',serif;font-size:11px;padding:10px 28px;border-radius:18px;cursor:pointer}
 
-    .btn-confirm {
-      width: 100%; background: linear-gradient(135deg, #2c5f2d, #1a3020);
-      border: 1.5px solid #c8973a; color: #f0e8d0;
-      font-family: 'Cinzel', serif; font-size: 15px;
-      padding: 15px; border-radius: 12px; cursor: pointer; letter-spacing: 0.08em;
-    }
-    .btn-confirm:active { transform: scale(0.98); }
-    .btn-confirm.disabled { opacity: 0.4; pointer-events: none; }
+/* PUZZLE */
+.pz-area{margin-bottom:11px}
+.pz-label{font-family:'Cinzel',serif;font-size:8px;color:#9fcfa0;letter-spacing:.15em;margin-bottom:7px;text-align:center;text-transform:uppercase}
+.dir-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:7px}
+.dir-btn{background:rgba(159,207,160,.06);border:1px solid rgba(159,207,160,.16);border-radius:9px;padding:11px 7px;color:#b8ddb8;font-family:'Cinzel',serif;font-size:11px;cursor:pointer;text-align:center;transition:all .2s}
+.dir-btn.selected{background:rgba(159,207,160,.18);border-color:#9fcfa0;color:#e8f8e8}
+.dir-btn.wrong{background:rgba(210,55,55,.16);border-color:rgba(210,55,55,.42);animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.ans-input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(200,151,58,.2);border-radius:9px;padding:11px 12px;color:#f0e8d0;font-family:'Crimson Text',serif;font-size:15px;outline:none;margin-bottom:10px}
+.ans-input::placeholder{color:rgba(200,151,58,.3)}
+.ans-input:focus{border-color:rgba(200,151,58,.48)}
+.order-slots{display:flex;gap:8px;justify-content:center;margin-bottom:11px}
+.order-slot{width:60px;height:60px;background:rgba(200,151,58,.05);border:1.5px dashed rgba(200,151,58,.24);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:24px;cursor:pointer;transition:all .2s}
+.order-slot.filled{background:rgba(200,151,58,.15);border-style:solid;border-color:#c8973a}
+.rune-choices{display:flex;gap:8px;justify-content:center;margin-bottom:11px}
+.rune-choice{width:54px;height:54px;background:rgba(159,207,160,.06);border:1px solid rgba(159,207,160,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;transition:all .2s}
+.rune-choice:active{transform:scale(.94)}
+.rune-choice.used{opacity:.14;pointer-events:none}
 
-    .order-slots { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; }
-    .order-slot {
-      width: 70px; height: 70px;
-      background: rgba(200,151,58,0.08); border: 1.5px dashed rgba(200,151,58,0.3);
-      border-radius: 10px; display: flex; align-items: center; justify-content: center;
-      font-size: 28px; cursor: pointer; transition: all 0.2s;
-    }
-    .order-slot.filled { background: rgba(200,151,58,0.2); border-style: solid; border-color: #c8973a; }
-    .rune-choices { display: flex; gap: 10px; justify-content: center; margin-bottom: 16px; flex-wrap: wrap; }
-    .rune-choice {
-      width: 60px; height: 60px; background: rgba(159,207,160,0.1);
-      border: 1px solid rgba(159,207,160,0.3); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 26px; cursor: pointer; transition: all 0.2s;
-    }
-    .rune-choice:active { transform: scale(0.95); }
-    .rune-choice.used { opacity: 0.2; pointer-events: none; }
+/* PENALTY */
+#penalty-overlay{position:fixed;inset:0;z-index:200;background:rgba(130,20,20,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;opacity:0;pointer-events:none;transition:opacity .3s}
+#penalty-overlay.show{opacity:1;pointer-events:all}
+.pen-icon{font-size:46px;margin-bottom:10px;animation:fhappy .6s ease-in-out}
+.pen-title{font-family:'Cinzel',serif;font-size:18px;color:#f8d0d0;margin-bottom:6px}
+.pen-msg{font-size:11px;color:#f0c0c0;max-width:240px;line-height:1.7;margin-bottom:4px;white-space:pre-line}
+.pen-timer{font-family:'Cinzel',serif;font-size:44px;color:#f8d0d0;margin:10px 0}
+.pen-sub{font-size:10px;color:rgba(240,192,192,.55);font-style:italic}
 
-    #result-screen { background: rgba(10,26,10,0.97); padding: 40px 28px; text-align: center; }
-    .result-icon { font-size: 80px; margin-bottom: 16px; animation: pop 0.5s cubic-bezier(0.34,1.56,0.64,1); }
-    @keyframes pop { 0%{transform:scale(0)} 100%{transform:scale(1)} }
-    .result-title { font-family: 'Cinzel', serif; font-size: 26px; color: #f0e8d0; margin-bottom: 10px; }
-    .result-text { font-size: 15px; color: #a8c8a0; line-height: 1.8; font-style: italic; margin-bottom: 28px; max-width: 300px; }
-    .btn-retry {
-      background: rgba(200,60,60,0.2); border: 1px solid rgba(200,60,60,0.5);
-      color: #f0d0d0; font-family: 'Cinzel', serif; font-size: 14px;
-      padding: 12px 32px; border-radius: 24px; cursor: pointer;
-    }
+/* PARTICLES */
+#particles{position:fixed;inset:0;z-index:110;pointer-events:none;overflow:hidden}
+.particle{position:absolute;border-radius:50%;animation:rise linear forwards}
+@keyframes rise{0%{opacity:1;transform:translateY(0) scale(1)}100%{opacity:0;transform:translateY(-100vh) scale(0.3)}}
 
-    #penalty-overlay {
-      position: fixed; inset: 0; z-index: 200;
-      background: rgba(150,30,30,0.88);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      opacity: 0; pointer-events: none; transition: opacity 0.3s;
-    }
-    #penalty-overlay.show { opacity: 1; pointer-events: all; }
-    .penalty-icon { font-size: 60px; margin-bottom: 16px; }
-    .penalty-title { font-family: 'Cinzel', serif; font-size: 22px; color: #f8d0d0; margin-bottom: 10px; }
-    .penalty-text { font-size: 14px; color: #f0c0c0; text-align: center; max-width: 280px; line-height: 1.7; margin-bottom: 8px; }
-    .penalty-timer { font-family: 'Cinzel', serif; font-size: 48px; color: #f8d0d0; margin: 16px 0; }
-
-    #scan-hint {
-      position: fixed; bottom: 100px; left: 0; right: 0;
-      text-align: center; z-index: 50; pointer-events: none;
-    }
-    #scan-hint.hidden { display: none; }
-    .scan-hint-inner {
-      display: inline-block; background: rgba(0,0,0,0.65);
-      border: 1px solid rgba(200,151,58,0.4); border-radius: 24px;
-      padding: 10px 22px; font-family: 'Cinzel', serif; font-size: 12px;
-      color: #c8973a; letter-spacing: 0.1em;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
-  </style>
+/* RESULT */
+#result-screen{background:rgba(6,18,6,.97);text-align:center;padding:38px 26px}
+.res-icon{font-size:68px;margin-bottom:10px;animation:popin .5s cubic-bezier(.34,1.56,.64,1)}
+@keyframes popin{0%{transform:scale(0)}100%{transform:scale(1)}}
+.res-title{font-family:'Cinzel',serif;font-size:22px;color:#f0e8d0;margin-bottom:6px}
+.res-text{font-size:12px;color:#a8c8a0;line-height:1.8;font-style:italic;margin-bottom:20px;max-width:260px}
+.btn-retry{background:rgba(200,151,58,.13);border:1px solid rgba(200,151,58,.35);color:#e8d090;font-family:'Cinzel',serif;font-size:11px;padding:10px 28px;border-radius:18px;cursor:pointer}
+</style>
 </head>
 <body>
 
-<!-- INTRO -->
-<div class="screen" id="intro-screen">
-  <div class="intro-fairy">🧚</div>
-  <div class="intro-title">Garden Guardian</div>
-  <div class="intro-sub">A Fairy Tale AR Adventure</div>
-  <div class="intro-story">
-    A magic storm has swept through the garden, scattering the fairy village's enchanted fragments across three secret locations. Two guardians must work together to retrieve all the fragments and rebuild the home before sunset.
+<!-- PARTICLES LAYER -->
+<div id="particles"></div>
+
+<!-- ROLE SELECT -->
+<div class="screen" id="role-screen">
+  <div class="r-fairy">🧚</div>
+  <div class="r-title">Garden Guardian</div>
+  <div class="r-sub">A Fairy Tale AR Adventure</div>
+  <div class="r-story">A magic storm has shattered the fairy village. Two guardians must each follow their own path — and together, rebuild what was lost.</div>
+  <div class="r-cards">
+    <div class="r-card a" onclick="selectRole('A')">
+      <div class="r-card-icon">🌲</div>
+      <div class="r-card-name">Player A</div>
+      <div class="r-card-desc">Pine tree first, then left bench</div>
+    </div>
+    <div class="r-card b" onclick="selectRole('B')">
+      <div class="r-card-icon">🪵</div>
+      <div class="r-card-name">Player B</div>
+      <div class="r-card-desc">Dead stump first, then right bench</div>
+    </div>
   </div>
-  <div class="stars-display">
-    <span class="star-icon" id="intro-star-1">⭐</span>
-    <span class="star-icon" id="intro-star-2">⭐</span>
-    <span class="star-icon" id="intro-star-3">⭐</span>
-  </div>
-  <button class="btn-start" onclick="startGame()">Begin the Quest</button>
+  <div class="r-note">Each player selects their own role on their own phone</div>
 </div>
 
 <!-- HUD -->
 <div id="hud" class="hidden">
-  <div>
-    <div class="hud-title">Garden Guardian</div>
-    <div class="hud-stage" id="hud-stage">Stage One · The Ancient Tree</div>
+  <div class="hud-l">
+    <div class="hud-game">Garden Guardian</div>
+    <div class="hud-stage" id="hud-stage">Stage One</div>
+    <div class="hud-badge" id="hud-badge">Player A</div>
   </div>
   <div class="hud-stars">
-    <span class="hud-star" id="hud-star-1">⭐</span>
-    <span class="hud-star" id="hud-star-2">⭐</span>
-    <span class="hud-star" id="hud-star-3">⭐</span>
+    <span class="hud-star" id="hs1">⭐</span>
+    <span class="hud-star" id="hs2">⭐</span>
+    <span class="hud-star" id="hs3">⭐</span>
   </div>
 </div>
 
+<!-- FAIRY SPRITE -->
+<div id="fairy" class="hidden" onclick="fairySpeak()">
+  <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+    <ellipse cx="16" cy="26" rx="13" ry="8" fill="#9fcfa0" opacity=".6" transform="rotate(-22 16 26)"/>
+    <ellipse cx="48" cy="26" rx="13" ry="8" fill="#c8973a" opacity=".6" transform="rotate(22 48 26)"/>
+    <ellipse cx="14" cy="34" rx="9" ry="5" fill="#9fcfa0" opacity=".38" transform="rotate(12 14 34)"/>
+    <ellipse cx="50" cy="34" rx="9" ry="5" fill="#c8973a" opacity=".38" transform="rotate(-12 50 34)"/>
+    <ellipse cx="32" cy="36" rx="8" ry="10" fill="#f5d5a0"/>
+    <circle cx="32" cy="22" r="10" fill="#f5d5a0"/>
+    <circle cx="28" cy="21" r="1.8" fill="#2c5f2d"/>
+    <circle cx="36" cy="21" r="1.8" fill="#2c5f2d"/>
+    <circle cx="28.7" cy="20.4" r=".7" fill="white"/>
+    <circle cx="36.7" cy="20.4" r=".7" fill="white"/>
+    <path d="M28,25.5 Q32,29 36,25.5" fill="none" stroke="#2c5f2d" stroke-width="1.1" stroke-linecap="round"/>
+    <ellipse cx="32" cy="13" rx="10" ry="5" fill="#c8973a"/>
+    <ellipse cx="21" cy="16" rx="4" ry="5.5" fill="#c8973a"/>
+    <ellipse cx="43" cy="16" rx="4" ry="5.5" fill="#c8973a"/>
+    <line x1="40" y1="32" x2="55" y2="19" stroke="#c8973a" stroke-width="1.4" stroke-linecap="round"/>
+    <polygon points="55,15 57.5,21 52,21" fill="#c8973a"/>
+    <circle cx="57" cy="13" r="1.5" fill="#f0e8d0" opacity=".9"/>
+    <circle cx="52" cy="10" r="1" fill="#c8973a" opacity=".8"/>
+    <circle cx="60" cy="18" r="1" fill="#9fcfa0" opacity=".8"/>
+  </svg>
+</div>
+<div id="fairy-bubble"></div>
+
 <!-- SCAN HINT -->
 <div id="scan-hint" class="hidden">
-  <div class="scan-hint-inner">Point your camera at a marker card ✦</div>
+  <div class="sh-inner" id="sh-text">Point camera at your marker card ✦</div>
 </div>
 
 <!-- POPUP -->
 <div id="popup">
-  <div class="popup-handle"></div>
-  <div class="popup-icon" id="popup-icon">🌲</div>
-  <div class="popup-stage" id="popup-stage">Stage One</div>
-  <div class="popup-title" id="popup-title">The Ancient Tree's Secret</div>
-  <div class="popup-text" id="popup-text"></div>
-  <div class="popup-task">
-    <div class="popup-task-label" id="popup-task-label">Your Task</div>
-    <div class="popup-task-text" id="popup-task-text"></div>
+  <div class="p-handle"></div>
+  <div class="p-head">
+    <div class="p-icon" id="p-icon">🌲</div>
+    <div class="p-meta">
+      <div class="p-stage-label" id="p-stage">Stage One</div>
+      <div class="p-title" id="p-title">Ancient Tree</div>
+    </div>
+    <div class="p-rtag a" id="p-rtag">Player A</div>
   </div>
-  <div id="puzzle-container"></div>
-  <button class="btn-confirm" id="btn-confirm" onclick="confirmAnswer()">Confirm</button>
+  <div class="p-story" id="p-story"></div>
+  <div class="p-task-box">
+    <div class="p-task-label" id="p-task-label">Your Task</div>
+    <div class="p-task-text" id="p-task"></div>
+  </div>
+  <div id="pz"></div>
+  <button class="btn-confirm disabled" id="btn-ok" onclick="confirmAnswer()">Confirm</button>
+</div>
+
+<!-- WAIT SCREEN (manual dismiss) -->
+<div class="screen hidden" id="wait-screen">
+  <div class="wt-fairy">🧚</div>
+  <div class="wt-title" id="wt-title">Stage Complete!</div>
+  <div class="wt-text" id="wt-text"></div>
+  <button class="wt-btn" id="wt-btn" onclick="dismissWait()">I'm ready ✦</button>
 </div>
 
 <!-- PENALTY -->
 <div id="penalty-overlay">
-  <div class="penalty-icon">💨</div>
-  <div class="penalty-title">Magic Interference!</div>
-  <div class="penalty-text" id="penalty-text">You lost an energy star!</div>
-  <div class="penalty-timer" id="penalty-timer">30</div>
-  <div style="font-size:13px;color:#f0c0c0;font-style:italic">You may continue when the countdown ends</div>
+  <div class="pen-icon">💨</div>
+  <div class="pen-title">Magic Interference!</div>
+  <div class="pen-msg" id="pen-msg">You lost an energy star!</div>
+  <div class="pen-timer" id="pen-timer">30</div>
+  <div class="pen-sub">You may continue when the countdown ends</div>
 </div>
 
 <!-- RESULT -->
 <div class="screen hidden" id="result-screen">
-  <div class="result-icon" id="result-icon">✨</div>
-  <div class="result-title" id="result-title">Village Rebuilt!</div>
-  <div class="result-text" id="result-text">Guardians, you did it!</div>
-  <button class="btn-retry" id="result-btn" onclick="resetGame()">Play Again</button>
+  <div class="res-icon" id="res-icon">✨</div>
+  <div class="res-title" id="res-title">Village Rebuilt!</div>
+  <div class="res-text" id="res-text">Guardians, you did it!</div>
+  <button class="btn-retry" onclick="resetGame()">Play Again</button>
 </div>
 
 <!-- AR SCENE -->
-<a-scene
-  id="ar-scene"
-  style="display:none"
-  mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; uiLoading: no; uiScanning: no; uiError: no;"
-  color-space="sRGB"
-  renderer="colorManagement: true, physicallyCorrectLights"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false">
+<a-scene id="ar-scene" style="display:none"
+  mindar-image="imageTargetSrc:./targets.mind;autoStart:false;uiLoading:no;uiScanning:no;uiError:no;"
+  color-space="sRGB" renderer="colorManagement:true,physicallyCorrectLights"
+  vr-mode-ui="enabled:false" device-orientation-permission-ui="enabled:false">
+  <a-camera position="0 0 0" look-controls="enabled:false"></a-camera>
 
-  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-  <!-- Target 0: Pine Tree -->
-  <a-entity id="target-pine" mindar-image-target="targetIndex: 0">
-    <a-entity
-      geometry="primitive: sphere; radius: 0.08"
-      material="color: #9fcfa0; emissive: #4a8c3f; emissiveIntensity: 0.6; opacity: 0.9"
-      position="0 0.18 0"
-      animation="property: position; to: 0 0.26 0; loop: true; dur: 1400; dir: alternate; easing: easeInOutSine">
-    </a-entity>
-    <a-entity
-      geometry="primitive: ring; radiusInner: 0.06; radiusOuter: 0.1"
-      material="color: #c8973a; opacity: 0.6; side: double"
-      position="0 0.18 0"
-      animation="property: rotation; to: 0 360 0; loop: true; dur: 2500; easing: linear">
-    </a-entity>
-    <a-entity
-      geometry="primitive: plane; width: 0.55; height: 0.12"
-      material="color: #1a3a1a; opacity: 0.88; side: double"
-      position="0 0.36 0">
-      <a-text value="The Fairy Is Here" align="center" color="#c8973a" width="1.6" position="0 0 0.001"></a-text>
+  <!-- Marker 0: Pine Tree — Player A Stage 1 -->
+  <a-entity id="t0" mindar-image-target="targetIndex:0">
+    <a-entity geometry="primitive:sphere;radius:.09" material="color:#9fcfa0;emissive:#3a8c3f;emissiveIntensity:.7;opacity:.93" position="0 .2 0" animation="property:position;to:0 .3 0;loop:true;dur:1300;dir:alternate;easing:easeInOutSine"></a-entity>
+    <a-entity geometry="primitive:ring;radiusInner:.07;radiusOuter:.11" material="color:#c8973a;opacity:.55;side:double" position="0 .2 0" animation="property:rotation;to:0 360 0;loop:true;dur:2400;easing:linear"></a-entity>
+    <a-entity geometry="primitive:sphere;radius:.04" material="color:#f0e8d0;emissive:#f0e8d0;emissiveIntensity:.9;opacity:.8" position=".18 .32 0" animation="property:position;to:-.18 .32 0;loop:true;dur:2000;dir:alternate;easing:easeInOutSine"></a-entity>
+    <a-entity geometry="primitive:plane;width:.52;height:.12" material="color:#1a3a1a;opacity:.9;side:double" position="0 .38 0">
+      <a-text value="Player A — Scan Here" align="center" color="#c8973a" width="1.55" position="0 0 .001"></a-text>
     </a-entity>
   </a-entity>
 
-  <!-- Target 1: Stump -->
-  <a-entity id="target-stump" mindar-image-target="targetIndex: 1">
-    <a-entity
-      geometry="primitive: sphere; radius: 0.11"
-      material="color: #c8783c; emissive: #8a4a1c; emissiveIntensity: 0.6; opacity: 0.85"
-      position="0 0.16 0"
-      animation="property: scale; to: 1.25 1.25 1.25; loop: true; dur: 900; dir: alternate; easing: easeInOutSine">
-    </a-entity>
-    <a-entity
-      geometry="primitive: ring; radiusInner: 0.09; radiusOuter: 0.13"
-      material="color: #e8a060; opacity: 0.5; side: double"
-      position="0 0.16 0"
-      animation="property: rotation; to: 0 360 0; loop: true; dur: 3000; easing: linear">
-    </a-entity>
-    <a-entity
-      geometry="primitive: plane; width: 0.55; height: 0.12"
-      material="color: #2a1a08; opacity: 0.88; side: double"
-      position="0 0.34 0">
-      <a-text value="Memory of the Storm" align="center" color="#e8a060" width="1.6" position="0 0 0.001"></a-text>
+  <!-- Marker 1: Dead Stump — Player B Stage 1 -->
+  <a-entity id="t1" mindar-image-target="targetIndex:1">
+    <a-entity geometry="primitive:sphere;radius:.11" material="color:#c8783c;emissive:#8a4a1c;emissiveIntensity:.65;opacity:.88" position="0 .18 0" animation="property:scale;to:1.28 1.28 1.28;loop:true;dur:820;dir:alternate;easing:easeInOutSine"></a-entity>
+    <a-entity geometry="primitive:ring;radiusInner:.09;radiusOuter:.14" material="color:#e8a060;opacity:.5;side:double" position="0 .18 0" animation="property:rotation;to:0 360 0;loop:true;dur:2900;easing:linear"></a-entity>
+    <a-entity geometry="primitive:sphere;radius:.035" material="color:#f8d0a0;emissive:#f8d0a0;emissiveIntensity:.9;opacity:.75" position="-.16 .3 0" animation="property:position;to:.16 .3 0;loop:true;dur:1800;dir:alternate;easing:easeInOutSine"></a-entity>
+    <a-entity geometry="primitive:plane;width:.52;height:.12" material="color:#2a1a08;opacity:.9;side:double" position="0 .36 0">
+      <a-text value="Player B — Scan Here" align="center" color="#e8a060" width="1.55" position="0 0 .001"></a-text>
     </a-entity>
   </a-entity>
 
-  <!-- Target 2: Bench A -->
-  <a-entity id="target-bench-a" mindar-image-target="targetIndex: 2">
-    <a-entity
-      geometry="primitive: dodecahedron; radius: 0.1"
-      material="color: #64a0dc; emissive: #1a4a8c; emissiveIntensity: 0.5; opacity: 0.9"
-      position="0 0.16 0"
-      animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear">
-    </a-entity>
-    <a-entity
-      geometry="primitive: plane; width: 0.55; height: 0.12"
-      material="color: #081420; opacity: 0.88; side: double"
-      position="0 0.32 0">
-      <a-text value="Left Half of the Sky" align="center" color="#90c0f0" width="1.6" position="0 0 0.001"></a-text>
+  <!-- Marker 2: Left Bench — Player A Stage 2 -->
+  <a-entity id="t2" mindar-image-target="targetIndex:2">
+    <a-entity geometry="primitive:dodecahedron;radius:.1" material="color:#64a0dc;emissive:#1a4a8c;emissiveIntensity:.55;opacity:.92" position="0 .18 0" animation="property:rotation;to:360 360 0;loop:true;dur:3700;easing:linear"></a-entity>
+    <a-entity geometry="primitive:ring;radiusInner:.12;radiusOuter:.16" material="color:#64a0dc;opacity:.3;side:double" position="0 .18 0" animation="property:rotation;to:0 360 0;loop:true;dur:5000;easing:linear"></a-entity>
+    <a-entity geometry="primitive:plane;width:.52;height:.12" material="color:#081420;opacity:.9;side:double" position="0 .34 0">
+      <a-text value="Player A — Left Bench" align="center" color="#90c0f0" width="1.55" position="0 0 .001"></a-text>
     </a-entity>
   </a-entity>
 
-  <!-- Target 3: Bench B -->
-  <a-entity id="target-bench-b" mindar-image-target="targetIndex: 3">
-    <a-entity
-      geometry="primitive: dodecahedron; radius: 0.1"
-      material="color: #b464dc; emissive: #6a1a9c; emissiveIntensity: 0.5; opacity: 0.9"
-      position="0 0.16 0"
-      animation="property: rotation; to: 360 360 0; loop: true; dur: 4000; easing: linear">
-    </a-entity>
-    <a-entity
-      geometry="primitive: plane; width: 0.55; height: 0.12"
-      material="color: #140820; opacity: 0.88; side: double"
-      position="0 0.32 0">
-      <a-text value="Right Half of the Sky" align="center" color="#d090f0" width="1.6" position="0 0 0.001"></a-text>
+  <!-- Marker 3: Right Bench — Player B Stage 2 -->
+  <a-entity id="t3" mindar-image-target="targetIndex:3">
+    <a-entity geometry="primitive:dodecahedron;radius:.1" material="color:#b464dc;emissive:#6a1a9c;emissiveIntensity:.55;opacity:.92" position="0 .18 0" animation="property:rotation;to:360 360 0;loop:true;dur:3700;easing:linear"></a-entity>
+    <a-entity geometry="primitive:ring;radiusInner:.12;radiusOuter:.16" material="color:#b464dc;opacity:.3;side:double" position="0 .18 0" animation="property:rotation;to:0 360 0;loop:true;dur:5000;easing:linear"></a-entity>
+    <a-entity geometry="primitive:plane;width:.52;height:.12" material="color:#140820;opacity:.9;side:double" position="0 .34 0">
+      <a-text value="Player B — Right Bench" align="center" color="#d090f0" width="1.55" position="0 0 .001"></a-text>
     </a-entity>
   </a-entity>
-
 </a-scene>
 
 <script>
-const STATE = {
-  stars: 3, stage: 1,
-  unlockedRunes: [], selectedDir: null,
-  finaleSlots: [null, null, null],
-  finaleChoices: ['🌿','🍄','🔮'],
-  correctOrder: ['🌿','🍄','🔮'],
-  playerRole: null, penaltyActive: false,
+// ══ AUDIO ══
+let AC = null;
+function getAC(){ if(!AC) AC=new(window.AudioContext||window.webkitAudioContext)(); return AC; }
+function tone(f,t,d,v,delay){
+  delay=delay||0; v=v||.24;
+  try{
+    const ac=getAC(),o=ac.createOscillator(),g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    o.type=t||'sine'; o.frequency.value=f;
+    const ts=ac.currentTime+delay;
+    g.gain.setValueAtTime(0,ts);
+    g.gain.linearRampToValueAtTime(v,ts+.025);
+    g.gain.exponentialRampToValueAtTime(.001,ts+d);
+    o.start(ts); o.stop(ts+d+.05);
+  }catch(e){}
+}
+const SFX = {
+  appear(){ tone(660,'sine',.1,.18); tone(880,'sine',.12,.2,.1); },
+  scan(){ tone(440,'sine',.1,.16); tone(660,'sine',.12,.2,.09); tone(880,'sine',.18,.26,.18); },
+  correct(){ [523,659,784,1047].forEach((f,i)=>tone(f,'sine',.22,.28,i*.09)); },
+  wrong(){ tone(280,'sawtooth',.1,.22); tone(220,'sawtooth',.14,.2,.12); },
+  star_lost(){ tone(380,'triangle',.18,.28); tone(280,'triangle',.22,.25,.18); },
+  victory(){
+    [523,659,784,1047,1319,1568].forEach((f,i)=>tone(f,'sine',.35,.3,i*.1));
+    [1319,1047,784,659,523].forEach((f,i)=>tone(f,'sine',.28,.25,.7+i*.09));
+  },
+  stage_clear(){ tone(784,'sine',.15,.28); tone(1047,'sine',.2,.32,.14); tone(1319,'sine',.25,.28,.28); },
+  click(){ tone(660,'sine',.07,.15); },
+};
+function sfx(n){ try{ if(AC) AC.resume(); SFX[n]&&SFX[n](); }catch(e){} }
+document.addEventListener('touchstart',()=>{ try{ getAC(); if(AC.state==='suspended') AC.resume(); }catch(e){} },{once:true});
+document.addEventListener('click',()=>{ try{ if(AC&&AC.state==='suspended') AC.resume(); }catch(e){} },{once:true});
+
+// ══ PARTICLES ══
+function burst(count,colors){
+  const p=document.getElementById('particles');
+  for(let i=0;i<count;i++){
+    const el=document.createElement('div');
+    el.className='particle';
+    const size=Math.random()*10+5;
+    el.style.cssText=`width:${size}px;height:${size}px;background:${colors[Math.floor(Math.random()*colors.length)]};left:${Math.random()*100}%;bottom:${Math.random()*30}%;animation-duration:${Math.random()*2+1.5}s;animation-delay:${Math.random()*.8}s`;
+    p.appendChild(el);
+    setTimeout(()=>el.remove(),3500);
+  }
+}
+function correctBurst(){ burst(18,['#c8973a','#9fcfa0','#f0e8d0','#64a0dc']); }
+function victoryBurst(){
+  for(let i=0;i<4;i++) setTimeout(()=>burst(22,['#c8973a','#9fcfa0','#f0e8d0','#d090f0','#f5c4b3','#90c0f0']),i*400);
+}
+
+// ══ STATE ══
+const S={role:null,stars:3,stage:1,solved:false,selectedDir:null,finaleSlots:[null,null,null],penaltyActive:false};
+
+// ══ CONTENT MAP ══
+// stage 1 = first scan (pine / stump), stage 2 = second scan (benches), stage 3 = finale
+const C={
+  A:{
+    1:{
+      icon:'🌲',stageLabel:'Stage One',title:"Ancient Tree's Secret",
+      story:"This ancient sequoia has stood for centuries. Its shadow in the afternoon sun hides the first clue…",
+      task:"1. Scan the pine tree marker.\n2. An AR symbol appears — describe its shape to Player B.\n3. Player B will tell you a direction.\n4. Select that direction below and confirm.",
+      puzzle:'direction', correct:'North-East ↗', hud:'Stage 1 · Pine Tree',
+      scanHint:'Scan the pine tree marker ✦'
+    },
+    2:{
+      icon:'🪑',stageLabel:'Stage Two',title:'Left Half of the Sky',
+      story:"Go to the back of the LEFT bench. Half a constellation is hidden here — only you can see it.",
+      task:"1. Go to the LEFT bench.\n2. Scan the marker on the back of the backrest.\n3. You see the LEFT half of Orion — three stars in an arc.\n4. Describe your stars to Player B (no showing screens!).\n5. Listen to Player B's stars.\n6. Together, type the full constellation name.",
+      puzzle:'text', correct:'orion', hud:'Stage 2 · Left Bench',
+      scanHint:'Go to left bench — scan back ✦'
+    },
+  },
+  B:{
+    1:{
+      icon:'🪵',stageLabel:'Stage One',title:'Memory of the Storm',
+      story:"This tree was struck down by the magic storm. Its spirit whispers the direction the wind came from…",
+      task:"1. Scan the dead stump marker.\n2. AR voice reveals: \"The storm swept from the South-West.\"\n3. Tell this direction to Player A.\n4. Player A will describe a symbol — listen carefully.\n5. Select the correct direction below and confirm.",
+      puzzle:'direction', correct:'South-West ↙', hud:'Stage 1 · Dead Stump',
+      scanHint:'Scan the dead stump marker ✦'
+    },
+    2:{
+      icon:'🪑',stageLabel:'Stage Two',title:'Right Half of the Sky',
+      story:"Go to the back of the RIGHT bench. The other half of the constellation is hidden here — only you can see it.",
+      task:"1. Go to the RIGHT bench.\n2. Scan the marker on the back of the backrest.\n3. You see the RIGHT half of Orion — two stars in a line.\n4. Describe your stars to Player A (no showing screens!).\n5. Listen to Player A's stars.\n6. Together, type the full constellation name.",
+      puzzle:'text', correct:'orion', hud:'Stage 2 · Right Bench',
+      scanHint:'Go to right bench — scan back ✦'
+    },
+  },
+  finale:{
+    icon:'🏡',stageLabel:'Final Stage',title:'Rebuilding the Village',
+    story:"All three fragments gathered! Both guardians walk to the centre of the lawn together. Arrange the runes in the correct order to restore the village.",
+    task:"Both players meet at the centre of the lawn.\n\nRecall the runes you each collected:\n· Stage 1 clue = Leaf rune 🌿\n· Stage 2 clue = Mushroom rune 🍄\n· The fairy's gift = Crystal rune 🔮\n\nArrange them in story order: first thing found → last.",
+    puzzle:'order', correctOrder:['🌿','🍄','🔮'], hud:'Final Stage · Lawn Centre',
+    scanHint:'Walk to the centre of the lawn ✦'
+  }
 };
 
-const STAGES = {
-  1: {
-    icon: '🌲', stage: 'Stage One', title: "The Ancient Tree's Secret",
-    story: 'This ancient sequoia has stood here for centuries, witnessing the birth of the fairy village. A secret lies hidden in the direction of its shadow…',
-    taskA: 'Scan the pine tree marker. An AR fairy appears and shows you a mysterious symbol. Describe the shape to Player B, then follow their directions to walk along the shadow to the endpoint and scan the ground marker.',
-    taskB: 'Listen to Player A describe the symbol. Use the compass below to select the correct direction the shadow is pointing.',
-    puzzle: 'direction', correctDir: 'North-East ↗',
-    hud: 'Stage One · The Ancient Tree',
-  },
-  2: {
-    icon: '🪵', stage: 'Stage Two', title: 'Memory of the Storm',
-    story: "This tree was struck down by the magic storm, but its spirit still lingers. Scan it and listen — the direction the wind came from holds the answer…",
-    taskA: 'Listen to Player B describe the storm direction. Use the compass below to select the correct direction and confirm.',
-    taskB: 'Scan the stump. The AR voice message says: "The storm swept in from the South-West." Tell this to Player A.',
-    puzzle: 'direction', correctDir: 'South-West ↙',
-    hud: 'Stage Two · Memory of the Storm',
-  },
-  3: {
-    icon: '🪑', stage: 'Stage Three', title: 'The Secret of the Stars',
-    story: 'Two benches face each other, each guarding half the night sky. Together you must piece together the full constellation…',
-    taskA: 'Scan the left bench (back of backrest). You see the LEFT half of a constellation — three stars in an arc. Describe it to Player B without showing your screen, then both type the constellation name.',
-    taskB: 'Scan the right bench (back of backrest). You see the RIGHT half of a constellation — two stars in a straight line. Describe it to Player A without showing your screen, then both type the constellation name.',
-    puzzle: 'text', correctAnswer: 'orion',
-    hud: 'Stage Three · The Secret of the Stars',
-  },
-  4: {
-    icon: '🏡', stage: 'Final Stage', title: 'Rebuilding the Village',
-    story: 'All three fragments gathered! Arrange the runes in the correct order — the answer is hidden in the clues from the previous three stages…',
-    task: 'Both players walk to the centre of the lawn. Recall the runes from each stage and discuss the correct order together.',
-    puzzle: 'order',
-    hud: 'Final Stage · Rebuilding the Village',
-  },
+const TARGET_MAP=[
+  {id:'t0',role:'A',stage:1},
+  {id:'t1',role:'B',stage:1},
+  {id:'t2',role:'A',stage:2},
+  {id:'t3',role:'B',stage:2},
+];
+
+// ══ FAIRY HINTS ══
+const HINTS={
+  A:{1:["Head to the ancient pine tree!","Scan the marker at the base of the big sequoia.","The pine tree is your first destination."],
+     2:["Go to the left bench — scan the back!","Your next marker is on the back of the left bench.","Find the left bench and look behind it!"],
+     3:["Walk to the centre of the lawn!","Meet Player B at the centre of the grass!","Almost there — head to the lawn centre!"]},
+  B:{1:["Head to the dead tree stump!","Scan the marker inside the hollow stump.","The fallen dead stump holds your first clue."],
+     2:["Go to the right bench — scan the back!","Your next marker is on the back of the right bench.","Find the right bench and look behind it!"],
+     3:["Walk to the centre of the lawn!","Meet Player A at the centre of the grass!","Almost there — head to the lawn centre!"]}
 };
 
-function updateStars() {
-  [1,2,3].forEach(i => {
-    const lost = i > STATE.stars;
-    document.getElementById(`intro-star-${i}`)?.classList.toggle('lost', lost);
-    document.getElementById(`hud-star-${i}`)?.classList.toggle('lost', lost);
-  });
+let fairyTimer=null;
+function fairyAnim(cls){
+  const f=document.getElementById('fairy');
+  f.querySelector('svg').className='';
+  void f.querySelector('svg').offsetWidth;
+  if(cls){ f.querySelector('svg').className=cls; setTimeout(()=>{ if(f.querySelector('svg')) f.querySelector('svg').className=''; },2000); }
+}
+function fairySpeak(){
+  sfx('click');
+  const s=S.stage>2?3:S.stage;
+  const hints=S.role?HINTS[S.role][s]:null;
+  if(!hints) return;
+  const msg=hints[Math.floor(Math.random()*hints.length)];
+  const b=document.getElementById('fairy-bubble');
+  b.textContent=msg; b.classList.add('show');
+  clearTimeout(fairyTimer); fairyTimer=setTimeout(()=>b.classList.remove('show'),4200);
 }
 
-function loseStar(msg) {
-  if (STATE.penaltyActive) return;
-  STATE.stars = Math.max(0, STATE.stars - 1);
-  updateStars();
-  if (STATE.stars <= 0) { showGameOver(); return; }
-  showPenalty(msg);
+// ══ STARS ══
+function updateStars(){
+  [1,2,3].forEach(i=>document.getElementById('hs'+i)?.classList.toggle('lost',i>S.stars));
 }
 
-function showPenalty(msg, duration = 30) {
-  STATE.penaltyActive = true;
-  document.getElementById('penalty-text').textContent = msg;
-  const overlay = document.getElementById('penalty-overlay');
-  const timerEl = document.getElementById('penalty-timer');
-  overlay.classList.add('show');
-  let t = duration;
-  timerEl.textContent = t;
-  const interval = setInterval(() => {
-    t--; timerEl.textContent = t;
-    if (t <= 0) {
-      clearInterval(interval);
-      overlay.classList.remove('show');
-      STATE.penaltyActive = false;
-    }
-  }, 1000);
+// ══ ROLE SELECT ══
+function selectRole(role){
+  S.role=role; sfx('appear'); getAC();
+  document.getElementById('role-screen').classList.add('hidden');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('fairy').classList.remove('hidden');
+  const b=document.getElementById('hud-badge');
+  b.textContent='Player '+role; b.className='hud-badge '+role.toLowerCase();
+  document.getElementById('hud-stage').textContent=C[role][1].hud;
+  showScanHint();
+  // Auto-hint after 5s
+  setTimeout(fairySpeak,5000);
+  startAR();
 }
 
-function showGameOver() {
-  hidePopup();
-  document.getElementById('result-icon').textContent = '😔';
-  document.getElementById('result-title').textContent = 'The Fairy Has Fainted…';
-  document.getElementById('result-text').textContent = "The fairy's energy is spent — but there's still a flicker of hope. Guardians, set out again!";
-  document.getElementById('result-btn').textContent = 'Try Again';
-  document.getElementById('result-screen').classList.remove('hidden');
-}
-
-function showVictory() {
-  hidePopup();
-  document.getElementById('result-icon').textContent = '✨';
-  document.getElementById('result-title').textContent = 'Village Rebuilt!';
-  document.getElementById('result-text').textContent = `You did it, Guardians! The fairy village has been restored on the lawn. Stars remaining: ${STATE.stars} ⭐`;
-  document.getElementById('result-btn').textContent = 'Play Again';
-  document.getElementById('result-screen').classList.remove('hidden');
-}
-
-function resetGame() {
-  STATE.stars = 3; STATE.stage = 1;
-  STATE.unlockedRunes = []; STATE.selectedDir = null;
-  STATE.finaleSlots = [null, null, null];
-  updateStars();
-  document.getElementById('result-screen').classList.add('hidden');
-  document.getElementById('intro-screen').classList.remove('hidden');
-  hidePopup();
-}
-
-async function startGame() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-    stream.getTracks().forEach(t => t.stop());
-  } catch(e) {
-    alert('Camera access is required. Please allow camera access in Safari Settings and try again.');
+// ══ AR ══
+async function startAR(){
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    s.getTracks().forEach(t=>t.stop());
+  }catch(e){
+    alert('Camera access required. Please allow camera in Safari Settings.');
     return;
   }
-  document.getElementById('intro-screen').classList.add('hidden');
-  document.getElementById('hud').classList.remove('hidden');
-  document.getElementById('scan-hint').classList.remove('hidden');
-  document.getElementById('hud-stage').textContent = STAGES[1].hud;
-  const sceneEl = document.getElementById('ar-scene');
-  sceneEl.style.display = 'block';
-  const tryStart = () => {
-    const arSystem = sceneEl.systems && sceneEl.systems['mindar-image-system'];
-    if (arSystem) { arSystem.start(); setupTargetListeners(); }
-    else { setTimeout(tryStart, 200); }
-  };
-  if (sceneEl.hasLoaded) { setTimeout(tryStart, 300); }
-  else { sceneEl.addEventListener('loaded', () => setTimeout(tryStart, 300), { once: true }); }
+  const scene=document.getElementById('ar-scene');
+  scene.style.display='block';
+  const go=()=>{ const sys=scene.systems&&scene.systems['mindar-image-system']; if(sys){sys.start();setupTargets();}else setTimeout(go,200); };
+  if(scene.hasLoaded) setTimeout(go,200);
+  else scene.addEventListener('loaded',()=>setTimeout(go,200),{once:true});
 }
 
-function setupTargetListeners() {
-  [
-    { id: 'target-pine',    stage: 1, role: 'A' },
-    { id: 'target-stump',   stage: 2, role: 'B' },
-    { id: 'target-bench-a', stage: 3, role: 'A' },
-    { id: 'target-bench-b', stage: 3, role: 'B' },
-  ].forEach(t => {
-    const el = document.getElementById(t.id);
-    if (!el) return;
-    el.addEventListener('targetFound', () => {
-      if (STATE.stage === t.stage) {
-        STATE.playerRole = t.role;
-        showStagePopup(t.stage);
+// ══ SCAN HINT ══
+function showScanHint(){
+  const el=document.getElementById('scan-hint');
+  const tx=document.getElementById('sh-text');
+  if(S.stage===3){ tx.textContent='Walk to the centre of the lawn ✦'; el.classList.remove('hidden'); return; }
+  const c=S.role&&C[S.role]?.[S.stage];
+  tx.textContent=c?c.scanHint:'Point camera at your marker card ✦';
+  el.classList.remove('hidden');
+}
+function hideScanHint(){ document.getElementById('scan-hint').classList.add('hidden'); }
+
+// ══ TARGETS ══
+function setupTargets(){
+  TARGET_MAP.forEach(t=>{
+    const el=document.getElementById(t.id);
+    if(!el) return;
+    el.addEventListener('targetFound',()=>{
+      if(t.role===S.role && t.stage===S.stage && !S.solved){
+        sfx('scan'); fairyAnim('fairy-happy'); showPopup();
       }
     });
   });
 }
 
-function showStagePopup(stage) {
-  const s = STAGES[stage];
-  if (!s) return;
-  document.getElementById('popup-icon').textContent = s.icon;
-  document.getElementById('popup-stage').textContent = s.stage;
-  document.getElementById('popup-title').textContent = s.title;
-  document.getElementById('popup-text').textContent = s.story;
-  const taskText = s.task || (STATE.playerRole === 'B' ? s.taskB : s.taskA);
-  document.getElementById('popup-task-label').textContent =
-    STATE.playerRole ? `Player ${STATE.playerRole} · Your Task` : 'Your Task';
-  document.getElementById('popup-task-text').textContent = taskText;
-  buildPuzzle(stage, s);
-  document.getElementById('scan-hint').classList.add('hidden');
+// ══ POPUP ══
+function showPopup(){
+  const c=S.stage===3?C.finale:C[S.role][S.stage];
+  document.getElementById('p-icon').textContent=c.icon;
+  document.getElementById('p-stage').textContent=c.stageLabel;
+  document.getElementById('p-title').textContent=c.title;
+  document.getElementById('p-story').textContent=c.story;
+  const rtag=document.getElementById('p-rtag');
+  if(S.stage===3){ rtag.textContent='Both Players'; rtag.className='p-rtag both'; }
+  else{ rtag.textContent='Player '+S.role; rtag.className='p-rtag '+S.role.toLowerCase(); }
+  document.getElementById('p-task-label').textContent=S.stage===3?'Final Task':'Player '+S.role+' · Your Task';
+  document.getElementById('p-task').textContent=c.task;
+  buildPuzzle(c);
+  hideScanHint();
   document.getElementById('popup').classList.add('show');
 }
+function hidePopup(){ document.getElementById('popup').classList.remove('show'); }
 
-function hidePopup() {
-  document.getElementById('popup').classList.remove('show');
-  document.getElementById('scan-hint').classList.remove('hidden');
-}
+// ══ PUZZLE ══
+function buildPuzzle(c){
+  const pz=document.getElementById('pz');
+  const btn=document.getElementById('btn-ok');
+  pz.innerHTML=''; S.selectedDir=null;
+  btn.className='btn-confirm disabled';
 
-function buildPuzzle(stage, s) {
-  const container = document.getElementById('puzzle-container');
-  const confirmBtn = document.getElementById('btn-confirm');
-  container.innerHTML = '';
-  STATE.selectedDir = null;
-  confirmBtn.classList.remove('disabled');
-
-  if (s.puzzle === 'direction') {
-    const dirs = ['North ↑','South ↓','North-East ↗','South-West ↙'];
-    container.innerHTML = `
-      <div class="puzzle-area">
-        <div class="puzzle-label">Choose the correct direction</div>
-        <div class="direction-grid">
-          ${dirs.map(d => `<button class="dir-btn" onclick="selectDir(this,'${d}')">${d}</button>`).join('')}
-        </div>
-      </div>`;
-    confirmBtn.classList.add('disabled');
-  } else if (s.puzzle === 'text') {
-    container.innerHTML = `
-      <div class="puzzle-area">
-        <div class="puzzle-label">Both players type the same constellation name</div>
-        <input class="answer-input" id="answer-input" placeholder="e.g. Orion" oninput="checkInputReady()">
-      </div>`;
-    confirmBtn.classList.add('disabled');
-  } else if (s.puzzle === 'order') {
-    STATE.finaleSlots = [null, null, null];
-    buildFinale(container);
+  if(c.puzzle==='direction'){
+    const dirs=['North ↑','South ↓','North-East ↗','South-West ↙'];
+    pz.innerHTML=`<div class="pz-area"><div class="pz-label">Select the correct direction</div><div class="dir-grid">${dirs.map(d=>`<button class="dir-btn" onclick="selDir(this,'${d}')">${d}</button>`).join('')}</div></div>`;
+  } else if(c.puzzle==='text'){
+    pz.innerHTML=`<div class="pz-area"><div class="pz-label">Both players type the same constellation name</div><input class="ans-input" id="ans" placeholder="e.g. Orion" oninput="chkTxt()"></div>`;
+  } else if(c.puzzle==='order'){
+    S.finaleSlots=[null,null,null];
+    buildOrder();
   }
 }
 
-function selectDir(btn, dir) {
-  document.querySelectorAll('.dir-btn').forEach(b => b.classList.remove('selected'));
-  btn.classList.add('selected');
-  STATE.selectedDir = dir;
-  document.getElementById('btn-confirm').classList.remove('disabled');
+function selDir(btn,dir){
+  document.querySelectorAll('.dir-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected'); S.selectedDir=dir;
+  document.getElementById('btn-ok').className='btn-confirm';
+  sfx('click');
 }
-
-function checkInputReady() {
-  const val = document.getElementById('answer-input')?.value?.trim();
-  document.getElementById('btn-confirm').classList.toggle('disabled', !val);
+function chkTxt(){
+  const v=document.getElementById('ans')?.value?.trim();
+  document.getElementById('btn-ok').className=v?'btn-confirm':'btn-confirm disabled';
 }
-
-function buildFinale(container) {
-  const slotsHtml = STATE.finaleSlots.map((s,i) =>
-    `<div class="order-slot ${s?'filled':''}" id="slot-${i}" onclick="clearSlot(${i})">${s||''}</div>`
-  ).join('');
-  const choicesHtml = STATE.finaleChoices.map(r =>
-    `<div class="rune-choice ${STATE.finaleSlots.includes(r)?'used':''}" onclick="placeRune('${r}')">${r}</div>`
-  ).join('');
-  container.innerHTML = `
-    <div class="puzzle-area">
-      <div class="puzzle-label">Arrange the three runes in the correct order</div>
-      <div class="order-slots">${slotsHtml}</div>
-      <div class="rune-choices">${choicesHtml}</div>
-    </div>`;
-  document.getElementById('btn-confirm').classList.toggle('disabled', STATE.finaleSlots.includes(null));
+function buildOrder(){
+  const pz=document.getElementById('pz');
+  const choices=['🌿','🍄','🔮'];
+  const slots=S.finaleSlots.map((r,i)=>`<div class="order-slot${r?' filled':''}" onclick="clrSlot(${i})">${r||''}</div>`).join('');
+  const ch=choices.map(r=>`<div class="rune-choice${S.finaleSlots.includes(r)?' used':''}" onclick="putRune('${r}')">${r}</div>`).join('');
+  pz.innerHTML=`<div class="pz-area"><div class="pz-label">Arrange the three runes in the correct order</div><div class="order-slots">${slots}</div><div class="rune-choices">${ch}</div></div>`;
+  document.getElementById('btn-ok').className=S.finaleSlots.includes(null)?'btn-confirm disabled':'btn-confirm';
 }
+function putRune(r){ const i=S.finaleSlots.indexOf(null); if(i===-1)return; S.finaleSlots[i]=r; sfx('click'); buildOrder(); }
+function clrSlot(i){ S.finaleSlots[i]=null; buildOrder(); }
 
-function placeRune(rune) {
-  const emptyIdx = STATE.finaleSlots.indexOf(null);
-  if (emptyIdx === -1) return;
-  STATE.finaleSlots[emptyIdx] = rune;
-  buildFinale(document.getElementById('puzzle-container'));
-  document.getElementById('btn-confirm').classList.toggle('disabled', STATE.finaleSlots.includes(null));
-}
+// ══ CONFIRM ══
+function confirmAnswer(){
+  const c=S.stage===3?C.finale:C[S.role][S.stage];
+  if(!c) return;
+  getAC(); if(AC.state==='suspended') AC.resume();
 
-function clearSlot(idx) {
-  STATE.finaleSlots[idx] = null;
-  buildFinale(document.getElementById('puzzle-container'));
-  document.getElementById('btn-confirm').classList.add('disabled');
-}
-
-function confirmAnswer() {
-  const stage = STATE.stage;
-  const s = STAGES[stage];
-  if (!s) return;
-
-  if (s.puzzle === 'direction') {
-    if (!STATE.selectedDir) return;
-    if (STATE.selectedDir === s.correctDir) {
-      advanceStage();
-    } else {
-      document.querySelectorAll('.dir-btn').forEach(b => {
-        if (b.classList.contains('selected')) b.classList.add('wrong');
-      });
-      const msg = stage === 2
-        ? 'Wrong direction! You lose one energy star. Stand back-to-back for 30 seconds — gestures only — then try again.'
-        : 'Wrong direction! You lose one energy star. Go back to the pine tree and read the new clue.';
-      setTimeout(() => loseStar(msg), 400);
+  if(c.puzzle==='direction'){
+    if(!S.selectedDir) return;
+    if(S.selectedDir===c.correct){ sfx('correct'); correctBurst(); fairyAnim('fairy-happy'); advance(); }
+    else{
+      sfx('wrong'); fairyAnim('fairy-sad');
+      document.querySelectorAll('.dir-btn').forEach(b=>{ if(b.classList.contains('selected')) b.classList.add('wrong'); });
+      setTimeout(()=>loseStar('Wrong direction!\nYou lose one energy star.\nStand back-to-back for 30 seconds.'),400);
     }
-  } else if (s.puzzle === 'text') {
-    const val = document.getElementById('answer-input')?.value?.trim().toLowerCase();
-    if (!val) return;
-    if (val.includes('orion')) {
-      advanceStage();
-    } else {
-      loseStar("Your answers don't match! You lose one energy star. Stand back-to-back and describe your half of the constellation again.");
-      document.getElementById('answer-input').value = '';
-      document.getElementById('btn-confirm').classList.add('disabled');
+  } else if(c.puzzle==='text'){
+    const v=document.getElementById('ans')?.value?.trim().toLowerCase();
+    if(!v) return;
+    if(v.includes('orion')){ sfx('correct'); correctBurst(); fairyAnim('fairy-happy'); advance(); }
+    else{
+      sfx('wrong'); fairyAnim('fairy-sad');
+      loseStar("Answers don't match!\nYou lose one energy star.\nDescribe your constellation half again.");
+      document.getElementById('ans').value='';
+      document.getElementById('btn-ok').className='btn-confirm disabled';
     }
-  } else if (s.puzzle === 'order') {
-    const match = STATE.finaleSlots.every((r,i) => r === STATE.correctOrder[i]);
-    if (match) {
-      showVictory();
-    } else {
-      loseStar('Wrong order! You lose one energy star. Recall the clues from the previous three stages…');
-      STATE.finaleSlots = [null, null, null];
-      buildFinale(document.getElementById('puzzle-container'));
+  } else if(c.puzzle==='order'){
+    const ok=['🌿','🍄','🔮'];
+    if(S.finaleSlots.every((r,i)=>r===ok[i])){ sfx('victory'); victoryBurst(); fairyAnim('fairy-happy'); setTimeout(showVictory,700); }
+    else{
+      sfx('wrong'); fairyAnim('fairy-sad');
+      loseStar('Wrong order!\nYou lose one energy star.\nRecall the clues from all three stages…');
+      S.finaleSlots=[null,null,null]; buildOrder();
     }
   }
 }
 
-function advanceStage() {
-  const runes = ['🌿','🍄','🔮'];
-  if (STATE.stage <= 3) STATE.unlockedRunes.push(runes[STATE.stage - 1]);
-  STATE.stage++;
+// ══ ADVANCE ══
+function advance(){
+  S.solved=true;
   hidePopup();
-  if (STATE.stage === 4) {
-    document.getElementById('hud-stage').textContent = STAGES[4].hud;
-    setTimeout(() => showStagePopup(4), 800);
-  } else if (STATE.stage > 4) {
-    showVictory();
-  } else {
-    document.getElementById('hud-stage').textContent = STAGES[STATE.stage]?.hud || '';
+  sfx('stage_clear');
+
+  if(S.stage===1){
+    const txt=S.role==='A'
+      ? "Stage 1 complete!\n\nNow go to the LEFT bench.\nScan the marker on the back of the backrest.\n\nTap 'I'm ready' when you've arrived."
+      : "Stage 1 complete!\n\nNow go to the RIGHT bench.\nScan the marker on the back of the backrest.\n\nTap 'I'm ready' when you've arrived.";
+    showWait('Stage 1 Complete! 🌿',txt);
+  } else if(S.stage===2){
+    showWait('Stage 2 Complete! 🪑',"Both guardians —\nwalk to the CENTRE of the lawn together.\n\nThe final stage awaits!\n\nTap 'I'm ready' when you've both arrived.");
   }
+}
+
+function showWait(title,text){
+  document.getElementById('wt-title').textContent=title;
+  document.getElementById('wt-text').textContent=text;
+  document.getElementById('wait-screen').classList.remove('hidden');
+}
+
+function dismissWait(){
+  sfx('click');
+  document.getElementById('wait-screen').classList.add('hidden');
+  S.stage++; S.solved=false;
+  if(S.stage===3){
+    document.getElementById('hud-stage').textContent=C.finale.hud;
+    document.getElementById('sh-text').textContent=C.finale.scanHint;
+    document.getElementById('scan-hint').classList.remove('hidden');
+    showPopup();
+  } else {
+    const c=C[S.role][S.stage];
+    document.getElementById('hud-stage').textContent=c.hud;
+    showScanHint();
+  }
+}
+
+// ══ LOSE STAR ══
+function loseStar(msg){
+  if(S.penaltyActive) return;
+  S.stars=Math.max(0,S.stars-1); updateStars(); sfx('star_lost');
+  if(S.stars<=0){ showGameOver(); return; }
+  S.penaltyActive=true;
+  document.getElementById('pen-msg').textContent=msg;
+  const ov=document.getElementById('penalty-overlay');
+  ov.classList.add('show');
+  let t=30; document.getElementById('pen-timer').textContent=t;
+  const iv=setInterval(()=>{
+    t--; document.getElementById('pen-timer').textContent=t;
+    if(t<=0){ clearInterval(iv); ov.classList.remove('show'); S.penaltyActive=false; }
+  },1000);
+}
+
+// ══ RESULTS ══
+function showGameOver(){
+  hidePopup();
+  document.getElementById('res-icon').textContent='😔';
+  document.getElementById('res-title').textContent='The Fairy Has Fainted…';
+  document.getElementById('res-text').textContent="Energy spent — but there's still a flicker of hope. Set out again, Guardians!";
+  document.getElementById('result-screen').classList.remove('hidden');
+}
+function showVictory(){
+  hidePopup();
+  document.getElementById('res-icon').textContent='✨';
+  document.getElementById('res-title').textContent='Village Rebuilt!';
+  document.getElementById('res-text').textContent=`You did it! The fairy village is restored on the lawn. Stars remaining: ${S.stars} ⭐`;
+  document.getElementById('result-screen').classList.remove('hidden');
+}
+function resetGame(){
+  sfx('click');
+  Object.assign(S,{role:null,stars:3,stage:1,solved:false,selectedDir:null,finaleSlots:[null,null,null],penaltyActive:false});
+  updateStars();
+  ['result-screen','wait-screen'].forEach(id=>document.getElementById(id).classList.add('hidden'));
+  document.getElementById('popup').classList.remove('show');
+  document.getElementById('penalty-overlay').classList.remove('show');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('fairy').classList.add('hidden');
+  document.getElementById('scan-hint').classList.add('hidden');
+  document.getElementById('fairy-bubble').classList.remove('show');
+  document.getElementById('role-screen').classList.remove('hidden');
+  clearTimeout(fairyTimer);
 }
 </script>
 </body>
